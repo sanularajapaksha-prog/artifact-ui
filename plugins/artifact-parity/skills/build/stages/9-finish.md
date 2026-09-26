@@ -37,13 +37,19 @@ Read `docker` from `design-ref/.parity-project.json`.
 
 - **`docker` is null** (no compose service builds this app): run `progress.mjs sub 9 --note "no Docker service for this app - final check on the dev server"`, and use the pass results as the final score. Skip to step 5.
 - **Otherwise, ask first - every run, because a restart replaces the running container:**
-  1. Run `progress.mjs wait 9 --note "confirm the container"` and return STATUS `needs-user`: "Your frontend runs in container `<container>` (service `<service>`, compose project `<project>`), served at `<docker url>`. I'll rebuild it with your changes, restart it, and check the design there. OK?" Options: `Yes, rebuild <container>` / `A different container` / `Skip the Docker check`.
-  2. **`A different container`:** list the project's containers (`docker ps -a --format "{{.Names}}  {{.Label \"com.docker.compose.service\"}}  {{.Status}}"`) and ask which one; then rerun `detect-project.mjs --container <picked name>` (it finds that container's service, app and rebuild commands, and remembers the pick) and ask this question again for it.
-  3. Only after `Yes`: run `progress.mjs sub 9 --note "docker build <service>"`, then the saved `build` command from the project root. Allow up to 15 minutes.
-  4. Run `progress.mjs sub 9 --note "docker restart <service>"`, then the saved `up` command.
-  5. Wait until `<docker url><path of preview_url>` answers (poll every 5s, up to 3 minutes). In `new` mode, use the confirmed `target` route, since the preview route is gone.
-  6. Probe it for a login (`capture.mjs --mode probe`). If a login is needed, ask as stage 3 does and run `capture.mjs --mode login` for this URL; the Docker host keeps its own session.
-  7. Run `progress.mjs sub 9 --note "measuring the Docker build"`, then capture in `build` mode on that URL and compare with `--scope "design-ref/<screen>/scope.json" --pass 4` (plus `--live-data` in `enhance` mode). This compare is the final score.
+  1. **Which URL (port) to check.** From `design-ref/.parity-project.json`: `user.urls[0]` is the one the user confirmed last time; `docker.url` is the detected one. Default = last time's if there is one, else the detected one.
+  2. Run `progress.mjs wait 9 --note "confirm the container and port"` and return STATUS `needs-user`: "Your frontend runs in container `<container>` (service `<service>`, compose project `<project>`). I'll rebuild it with your changes, restart it, and check the design at `<default url>` (<'you used it last time' | 'detected'>; <the other one, if different>). OK?" Options:
+     - `Yes, rebuild · check at <default url>`
+     - `Yes, rebuild · another port` - then ask for the port or URL (offer the other known URL as an option)
+     - `A different container`
+     - `Skip the Docker check`
+  3. Remember the URL the user confirmed: `detect-project.mjs --url "<url>"` (it becomes next run's "last time").
+  4. **`A different container`:** list the project's containers (`docker ps -a --format "{{.Names}}  {{.Label \"com.docker.compose.service\"}}  {{.Status}}"`) and ask which one; then rerun `detect-project.mjs --container <picked name>` (it finds that container's service, app and rebuild commands, and remembers the pick) and ask this question again for it.
+  5. Only after `Yes`: run `progress.mjs sub 9 --note "docker build <service>"`, then the saved `build` command from the project root. Allow up to 15 minutes.
+  6. Run `progress.mjs sub 9 --note "docker restart <service>"`, then the saved `up` command.
+  7. Wait until `<confirmed url><path of preview_url>` answers (poll every 5s, up to 3 minutes). In `new` mode, use the confirmed `target` route, since the preview route is gone.
+  8. Probe it for a login (`capture.mjs --mode probe`). If a login is needed, ask with the same three options as stage 3 (login window / env file I give / search env files) for this URL; the Docker host keeps its own session.
+  9. Run `progress.mjs sub 9 --note "measuring the Docker build"`, then capture in `build` mode on that URL and compare with `--scope "design-ref/<screen>/scope.json" --pass 4` (plus `--live-data` in `enhance` mode). This compare is the final score.
 - **If the Docker build or restart fails:**
   1. Keep the last 15 lines of its output, most of all the lines with `error`.
   2. Run `progress.mjs wait 9 --note "docker build failed"` and return STATUS `needs-user`: "The Docker rebuild failed: <main error line>. How should I rebuild the frontend?" Options: `Retry` / `I'll give my rebuild command` / `Skip the Docker check`.

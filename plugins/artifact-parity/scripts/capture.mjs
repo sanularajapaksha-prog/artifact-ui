@@ -8,6 +8,9 @@
 //   capture.mjs --data <dir> --mode build --target <preview URL>          --out <dir>
 //   capture.mjs --data <dir> --mode probe --target <URL>   prints "open" or "login needed"
 //   capture.mjs --data <dir> --mode login --target <URL>   opens a browser window; the user logs in
+//   capture.mjs --data <dir> --mode login --target <URL> --env <file> [--user-key K --pass-key K]
+//                                                        logs in by itself with the credentials in a user-given env file
+//   capture.mjs --data <dir> --mode env-search --target <project dir>   lists env files holding login key pairs (names only)
 // ref   writes ref.json, ref-map.md and ref-<size>.png
 // build writes build.json and build-<size>.png, reusing the sizes, hover
 //       targets and token names recorded in ref.json (so ref must run first).
@@ -33,8 +36,8 @@ const mode = flag('mode');
 const target = flag('target');
 const out = flag('out');
 const pageMode = mode === 'ref' || mode === 'build';
-if (typeof data !== 'string' || !['ref', 'build', 'probe', 'login'].includes(mode) || typeof target !== 'string' || (pageMode && typeof out !== 'string')) {
-  console.error('capture: --data, --mode ref|build|probe|login and --target are required (--out for ref and build)');
+if (typeof data !== 'string' || !['ref', 'build', 'probe', 'login', 'env-search'].includes(mode) || typeof target !== 'string' || (pageMode && typeof out !== 'string')) {
+  console.error('capture: --data, --mode ref|build|probe|login|env-search and --target are required (--out for ref and build)');
   process.exit(2);
 }
 const timeoutMs = (Number(flag('timeout')) || 60) * 1000;
@@ -86,26 +89,112 @@ async function probe() {
   } finally { await browser.close(); }
 }
 
+// ---------- login credentials from env files (values are never printed) ----------
+const PASS_KEY = /(PASS|PASSWORD|PWD)$/i;
+const USER_KEY = /(USER|USERNAME|EMAIL|LOGIN|LOGINNAME|LOGIN_NAME)$/i;
+function parseEnv(text) {
+  const vars = {};
+  for (const line of text.split(/\r?\n/)) {
+    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][\w.]*)\s*=\s*(.*?)\s*$/);
+    if (m) vars[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
+  }
+  return vars;
+}
+function loginKeys(vars) {
+  const passKeys = Object.keys(vars).filter((k) => PASS_KEY.test(k) && vars[k]);
+  const userKeys = Object.keys(vars).filter((k) => USER_KEY.test(k) && !PASS_KEY.test(k) && vars[k]);
+  // Pairs sharing a prefix, e.g. APP_E2E_USER + APP_E2E_PASS.
+  const pairs = passKeys.flatMap((p) => userKeys.filter((u) => u.replace(USER_KEY, '') === p.replace(PASS_KEY, '')).map((u) => [u, p]));
+  return { passKeys, userKeys, pairs };
+}
+
+// --mode env-search: lists env files in the project that hold login-like key pairs (names only).
+function envSearch() {
+  const root = path.resolve(target);
+  const skip = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'out', 'coverage', 'bin', 'obj']);
+  const found = [];
+  const walk = (dir, depth) => {
+    if (depth < 0) return;
+    let entries = [];
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) { if (!skip.has(e.name)) walk(full, depth - 1); continue; }
+      if (!/^\.env(\..+)?$|\.env$/i.test(e.name) || /\.(example|sample|template)$/i.test(e.name)) continue;
+      let text = '';
+      try { text = fs.readFileSync(full, 'utf8'); } catch { continue; }
+      const { pairs, userKeys, passKeys } = loginKeys(parseEnv(text));
+      const list = pairs.length ? pairs : (userKeys.length === 1 && passKeys.length === 1 ? [[userKeys[0], passKeys[0]]] : []);
+      for (const [u, p] of list) found.push(`${path.relative(root, full) || e.name} · ${u} / ${p}`);
+    }
+  };
+  walk(root, 5);
+  if (!found.length) { console.log('· no env file with a login user/password pair found (values are never shown)'); return; }
+  console.log(`✔ ${found.length} login key pair(s) found (names only - values are never shown):`);
+  for (const f of found.slice(0, 10)) console.log(`  - ${f}`);
+}
+
+// Reads a user-given env file and picks the login keys.
+function readCreds(envPath) {
+  let text;
+  try { text = fs.readFileSync(envPath, 'utf8'); } catch { fail(`env file not found: ${envPath}`); }
+  const vars = parseEnv(text);
+  let userKey = typeof flag('user-key') === 'string' ? flag('user-key') : null;
+  let passKey = typeof flag('pass-key') === 'string' ? flag('pass-key') : null;
+  const { passKeys, userKeys, pairs } = loginKeys(vars);
+  if (!userKey || !passKey) {
+    const pick = pairs.length === 1 ? pairs[0] : (userKeys.length === 1 && passKeys.length === 1 ? [userKeys[0], passKeys[0]] : null);
+    if (!pick) {
+      fail(`can't tell which keys in ${path.basename(envPath)} hold the login (user-like: ${userKeys.join(', ') || 'none'}; password-like: ${passKeys.join(', ') || 'none'}) - rerun with --user-key and --pass-key`);
+    }
+    [userKey, passKey] = [userKey || pick[0], passKey || pick[1]];
+  }
+  if (!vars[userKey] || !vars[passKey]) fail(`${!vars[userKey] ? userKey : passKey} is missing or empty in ${path.basename(envPath)}`);
+  return { user: vars[userKey], pass: vars[passKey], userKey, passKey, file: path.basename(envPath) };
+}
+
+const USER_FIELD = ['input[type=email]', 'input[autocomplete=username]', 'input[name*=user i]', 'input[name*=login i]',
+  'input[name*=email i]', 'input[id*=user i]', 'input[id*=email i]', 'input[type=text]'].map((s) => `${s}:visible`).join(', ');
+// One step of a login form: fills what is visible and submits. Handles one-page and
+// two-step forms (username first, then password, as Okta, Microsoft and Google do).
+async function fillLoginStep(page, creds) {
+  const pass = page.locator('input[type=password]:visible').first();
+  const user = page.locator(USER_FIELD).first();
+  let last = null;
+  if (await user.count() && !(await user.inputValue().catch(() => 'x'))) { await user.fill(creds.user); last = user; }
+  if (await pass.count()) { await pass.fill(creds.pass); last = pass; }
+  if (last) await last.press('Enter');
+  return !!last;
+}
+
 async function login() {
   const file = authFile(target);
   if (!file) fail('login needs an http(s) URL');
-  const browser = await launchBrowser(data, { headless: false });
+  const creds = typeof flag('env') === 'string' ? readCreds(flag('env')) : null;
+  const browser = await launchBrowser(data, creds ? {} : { headless: false });
   try {
-    const context = await browser.newContext({ viewport: null });
+    const context = await browser.newContext(creds ? { viewport: { width: 1440, height: HEIGHT } } : { viewport: null });
     const page = await context.newPage();
     await page.goto(target, { waitUntil: 'domcontentloaded', timeout: timeoutMs }).catch(() => {});
-    console.log('Log in in the browser window that just opened. It closes by itself once you are in.');
+    console.log(creds
+      ? `Logging in with ${creds.userKey} / ${creds.passKey} from ${creds.file} (values are not shown)...`
+      : 'Log in in the browser window that just opened. It closes by itself once you are in.');
     const origin = new URL(target).origin;
     const started = Date.now();
-    const deadline = started + 10 * 60 * 1000;
+    const deadline = started + (creds ? 90 : 600) * 1000;
     let okCount = 0;
     let sawLogin = false;
+    let steps = 0;
     while (Date.now() < deadline) {
       if (page.isClosed()) fail('the login window was closed before the login finished');
       await page.waitForTimeout(1000);
       const onSite = (() => { try { return new URL(page.url()).origin === origin; } catch { return false; } })();
       const atLogin = await looksLikeLogin(page);
       sawLogin ||= atLogin;
+      // Fill only on a login page or an identity provider's site - never into the app's own inputs.
+      if (creds && steps < 6 && (atLogin || !onSite)) {
+        if (await fillLoginStep(page, creds)) { steps++; await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {}); continue; }
+      }
       okCount = onSite && !atLogin ? okCount + 1 : 0;
       // Save only after a login page was seen (so a slow redirect to it isn't mistaken for "logged in"),
       // or after 20s on the site with no login page at all (already logged in).
@@ -118,6 +207,7 @@ async function login() {
         return;
       }
     }
+    if (creds) fail(`the login did not finish with ${creds.userKey} / ${creds.passKey} from ${creds.file} (still at ${page.url()}) - check those values, or use the login window`);
     fail('no login within 10 minutes');
   } finally { await browser.close().catch(() => {}); }
 }
@@ -551,7 +641,7 @@ async function main() {
   }
 }
 
-({ probe, login }[mode] || main)().catch((e) => {
+(async () => ({ probe, login, 'env-search': envSearch }[mode] || main)())().catch((e) => {
   console.log(`✖ capture failed: ${e instanceof CaptureError ? e.message : e.message.split('\n')[0]}`);
   process.exitCode = 1;
 });

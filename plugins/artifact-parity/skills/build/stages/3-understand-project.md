@@ -65,14 +65,32 @@ Check whether `preview_url` needs a login:
 node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode probe --target "<preview_url>"
 ```
 
-- It prints `login needed` or `open`. If `login needed`, run `progress.mjs wait 3 --note "log in once"` and return STATUS `needs-user`: "The page needs a login. A browser window will open - log in there, then close it." Options: `Open the login window` / `Stop`.
-- When resumed with "open", run:
+- It prints `open`, or `login needed`. On `login needed`, run `progress.mjs wait 3 --note "log in once"` and return STATUS `needs-user`: "The page needs a login. How do you want to sign in?" with exactly these three options (the env options are optional conveniences; never pick one for the user):
+  - `Open the login window` - "A browser window opens; you log in there yourself."
+  - `Use an env file I give` - "Type the path of an env file that holds the login." If `design-ref/.parity-project.json` has `user.loginEnv`, add "(last time: <that path>)" to this description.
+  - `Search the project's env files` - "I look for env files with a login user/password and you pick one."
+- When resumed:
+  - **Login window:**
 
 ```
 node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode login --target "<preview_url>"
 ```
 
-  It saves the session (never the password) in the plugin data folder; every later capture on that site uses it.
+  - **Env file I give** (a typed path, or "last time"): run the login with `--env "<path>"` (command below). If it prints `can't tell which keys`, ask which user and password keys to use (list the key names it printed as options) and rerun with `--user-key` and `--pass-key`.
+  - **Search:**
+
+```
+node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode env-search --target "."
+```
+
+    It prints `file · USER_KEY / PASS_KEY` lines, names only. Return STATUS `needs-user`: "Which login should I use?" with up to 4 of those lines as options plus `Open the login window`. If none were found, say so and offer `Open the login window` / `Use an env file I give`. On a pick, run the login with that file and keys.
+
+```
+node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode login --target "<preview_url>" --env "<path>" [--user-key <KEY> --pass-key <KEY>]
+```
+
+  - After an env login succeeds, remember the path (never the values): `detect-project.mjs --login-env "<path>"`. If the env login fails, show its one-line reason and ask the same three options again.
+- Never print, log or copy credential values; refer to them only by key name. The saved session (never the password) lives in the plugin data folder; every later capture on that site uses it.
 
 ## 6. Libraries, dev server, leftovers
 

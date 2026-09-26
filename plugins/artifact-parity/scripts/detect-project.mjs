@@ -184,7 +184,7 @@ async function findDocker(app, want = {}) {
 // Values the user stated (in the brief or an answer) win over detection and are remembered.
 const USER_FLAGS = {
   app: 'app', container: 'container', service: 'service', url: 'url',
-  'dev-command': 'devCommand', 'dev-url': 'devUrl', 'build-command': 'build', 'up-command': 'up',
+  'dev-command': 'devCommand', 'dev-url': 'devUrl', 'build-command': 'build', 'up-command': 'up', 'login-env': 'loginEnv',
 };
 
 async function main() {
@@ -192,8 +192,10 @@ async function main() {
   const user = flag('forget') === true ? {} : { ...(prev.user || {}) };
   for (const [f, key] of Object.entries(USER_FLAGS)) {
     const v = flag(f);
-    if (typeof v === 'string') user[key] = f === 'app' ? path.resolve(v) : v;
+    if (typeof v === 'string') user[key] = f === 'app' || f === 'login-env' ? path.resolve(v) : v;
   }
+  // Served URLs the user confirmed before, newest first, offered again next time.
+  if (typeof flag('url') === 'string') user.urls = [flag('url'), ...(user.urls || []).filter((u) => u !== flag('url'))].slice(0, 5);
 
   let named = null;
   if (user.container) {
@@ -243,6 +245,8 @@ async function main() {
     console.log(`  restart: ${docker.up || 'unknown - give it with --up-command'}${mine('up')}`);
     console.log(docker.url ? `  served at: ${docker.url}${mine('url')}` : '  served at: unknown - start the stack, or give it with --url');
   }
+  if (user.urls?.length) console.log(`  used before: ${user.urls.join(', ')}`);
+  if (user.loginEnv) console.log(`  login env file used before: ${user.loginEnv}`);
   console.log(`  saved: ${path.relative(projectDir, outFile)}`);
 }
 
