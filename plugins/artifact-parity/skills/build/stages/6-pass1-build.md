@@ -43,6 +43,6 @@ node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode build --target "<previe
 node "<ROOT>/scripts/compare.mjs" --dir "design-ref/<screen>" --scope "design-ref/<screen>/scope.json" --pass 1 [--live-data]
 ```
 
-10. **Report.** Run `progress.mjs done 6 --score "<score compare printed>" --note "<N> rows to fix"`.
+10. **Report.** Run `progress.mjs done 6 --from-report "design-ref/<screen>" [--note "<short reason>"]`. The score and row count come from compare's `result.json`; `--note` may only add a short reason (no counts, no percentages, no "clean"). Never report your own count of rows.
     - If compare reports CLEAN, also run `progress.mjs skip 7 --note "clean after pass 1"` and `progress.mjs skip 8 --note "clean after pass 1"`. Return all three lines.
     - Add these to NOTES: `score_pass_1`, `clean` (yes/no), `files` (created or changed), and in `enhance` mode `unwired` and `kept_extra` (or "none").

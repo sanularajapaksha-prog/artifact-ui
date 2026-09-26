@@ -282,6 +282,11 @@ async function main() {
     if (catRows.length > MAX_ROWS_PER_CATEGORY) lines.push(`| ... ${catRows.length - MAX_ROWS_PER_CATEGORY} more rows in this category | | | | |`);
   }
   fs.writeFileSync(path.join(dir, 'report.md'), `${lines.join('\n')}\n`);
+  // Machine-readable result: progress.mjs --from-report builds the stage line from this, not from anyone's summary.
+  fs.writeFileSync(path.join(dir, 'result.json'), JSON.stringify({
+    pass, score, pct: clean ? 100 : pct, passed, checks, rows: list.length, clean, scope: scopeText,
+    buildCapturedAt: build.capturedAt || null, comparedAt: new Date().toISOString(),
+  }, null, 2));
 
   console.log(`score: ${score}`);
   console.log(clean ? 'CLEAN · 0 differences' : `${list.length} rows to fix · ${path.join(dir, 'report.md')}${Object.keys(crops).length ? ` · ${Object.keys(crops).length} crops` : ''}`);

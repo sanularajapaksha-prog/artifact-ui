@@ -10,6 +10,8 @@
 //   progress.mjs start <stage> [--note <text>]
 //   progress.mjs sub   <stage> --note <text>          (detail while a stage runs)
 //   progress.mjs done  <stage> [--note <text>] [--score <text>]
+//   progress.mjs done  <stage> --from-report <design-ref/screen> [--note <extra>]
+//                      (score and row count come from compare's result.json, never from a summary)
 //   progress.mjs skip  <stage> [--note <text>]
 //   progress.mjs fail  <stage> --note <text>
 //   progress.mjs wait  <stage> --note <text>          (waiting for the user's answer)
@@ -208,12 +210,30 @@ function cmdSub() {
   emit(state, `${label(n)} ${G.run} ${note}`);
 }
 
+// The stage line's score and row count, straight from compare's result.json. The caller's
+// --note can only add a reason after them; it can never replace the numbers.
+function fromReport(dir, n, extra) {
+  const base = path.resolve(projectDir, dir);
+  let r;
+  try { r = JSON.parse(fs.readFileSync(path.join(base, 'result.json'), 'utf8')); } catch { usage(`--from-report: no result.json in ${dir} - run compare first`); }
+  const flagsOut = [];
+  let build = null;
+  try { build = JSON.parse(fs.readFileSync(path.join(base, 'build.json'), 'utf8')).capturedAt; } catch { /* no build yet */ }
+  if (build && r.buildCapturedAt && build !== r.buildCapturedAt) flagsOut.push('stale: compare ran before the latest build capture');
+  const expectedPass = n >= 6 && n <= 9 ? n - 5 : null;
+  if (expectedPass && r.pass !== expectedPass) flagsOut.push(`from the pass ${r.pass} report`);
+  if (/\d+\s*(rows?|differences?)\b|\d+\s*%|clean/i.test(extra)) usage('with --from-report, --note may give a reason but no row counts, percentages or "clean" - those come from result.json');
+  const rows = r.clean ? '' : `${r.rows} row${r.rows === 1 ? '' : 's'} ${n === 6 ? 'to fix' : 'left'}`;
+  return { score: r.score, note: [rows, ...flagsOut, extra].filter(Boolean).join(` ${G.dot} `) };
+}
+
 function cmdEnd(kind) {
   const n = stageNumber(positional[1]);
   const state = ensureState();
   const st = state.stages[n];
-  const note = typeof flags.note === 'string' ? flags.note : '';
-  const score = typeof flags.score === 'string' ? flags.score : '';
+  let note = typeof flags.note === 'string' ? flags.note : '';
+  let score = typeof flags.score === 'string' ? flags.score : '';
+  if (kind === 'done' && typeof flags['from-report'] === 'string') ({ score, note } = fromReport(flags['from-report'], n, note));
   if (kind === 'fail' && !note) usage('fail needs --note explaining why');
   state.waiting = '';
   st.endedAt = nowIso();

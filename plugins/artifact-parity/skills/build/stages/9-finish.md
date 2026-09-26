@@ -59,5 +59,5 @@ Read `docker` from `design-ref/.parity-project.json`.
 
 ## 5. Report
 
-1. Run `progress.mjs done 9 --score "<final score>" --note "<Docker <url> | dev server>"`. The script adds the total time.
+1. Run `progress.mjs done 9 --from-report "design-ref/<screen>" --note "<Docker <url> | dev server>"`. The score and row count come from the last compare's `result.json` (the Docker compare, or the last pass when there is no Docker); the script adds the total time and flags a stale or earlier-pass report.
 2. **NOTES:** add `files` (every file created or changed), `final_score`, `measured_on` (the Docker URL or "dev server"), `deleted` (leftovers removed, or none), `outside_frontend` (or none), `unwired` and `kept_extra` (enhance mode), and `left_rows` (from the final compare, or "none").
