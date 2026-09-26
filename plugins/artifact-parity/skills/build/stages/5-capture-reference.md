@@ -25,11 +25,15 @@ node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode ref --target "<source_f
 
 **Choose the part to build.**
 
-- **BRIEF names a part** (for example "only the pricing cards"): match it to the sections in `ref-map.md`, then write `design-ref/<screen>/scope.json`:
+- **BRIEF names a part** (for example "only the pricing cards"): match it to `ref-map.md`, then write `design-ref/<screen>/scope.json`.
+  - If the part is a whole section, use `"sections"`.
+  - If it is **smaller than its section** (a rail, a card group, a toolbar inside a bigger section), use `"elements"` with the part's subtree as a range - its first id to its last descendant's id, in `ref-map.md` order. Compare then checks only that part and measures x/y from its first element. **Never scope a whole section to cover a small part**: everything else in the section would be counted, and the score could never reach 100%.
 
 ```
-{ "brief": "<the user's words>", "sections": ["<section id>", "..."], "clicks": ["<ref clicks, if any>"] }
+{ "brief": "<the user's words>", "sections": ["<section id>"], "elements": ["r-022..r-055"], "clicks": ["<ref clicks, if any>"] }
 ```
+
+  - Allowed keys: `brief`, `sections`, `elements`, `clicks`, `build_clicks`, `note`. Compare stops on any other key.
 
 - **BRIEF names no part:** write the same file with `"sections": "all"`.
 - **The match is unclear**, because the words fit several sections or none:

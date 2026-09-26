@@ -65,14 +65,38 @@ async function main() {
   const build = readJson(path.join(dir, 'build.json'), 'build.json (run capture --mode build)');
   const scopeFile = flag('scope');
   const scope = typeof scopeFile === 'string' ? readJson(scopeFile, 'scope file') : { sections: 'all' };
-  const all = !Array.isArray(scope.sections);
-  if (!all) {
+  // Never silently ignore part of a scope: an unknown key would widen the check without anyone noticing.
+  const SCOPE_KEYS = ['brief', 'sections', 'elements', 'clicks', 'build_clicks', 'note'];
+  const badKeys = Object.keys(scope).filter((k) => !SCOPE_KEYS.includes(k));
+  if (badKeys.length) fail(`scope has keys compare doesn't understand: ${badKeys.join(', ')} - allowed: ${SCOPE_KEYS.join(', ')}`);
+
+  // "elements": precise part as ids or document-order ranges ("r-022..r-055" = that subtree). It wins over "sections".
+  const num = (id) => parseInt(String(id).replace(/^r-/, ''), 10);
+  const idOf = (n) => Object.keys(ref.elements).find((id) => num(id) === n);
+  let ranges = null;
+  if (scope.elements !== undefined) {
+    const entries = (Array.isArray(scope.elements) ? scope.elements : [scope.elements]).flatMap((e) => String(e).split(','));
+    ranges = entries.map((e) => e.trim()).filter(Boolean).map((e) => {
+      const m = e.match(/^(r-\d+)(?:\s*\.\.\s*(r-\d+))?$/);
+      if (!m) fail(`scope element "${e}" is not an id (r-012) or a range (r-022..r-055)`);
+      const [from, to] = [num(m[1]), num(m[2] || m[1])];
+      if (!idOf(from) || !idOf(to)) fail(`scope element "${e}" names an id the artifact doesn't have (see ref-map.md)`);
+      if (to < from) fail(`scope range "${e}" runs backwards`);
+      return { from, to, root: idOf(from) };
+    });
+    if (!ranges.length) fail('scope "elements" is empty');
+  }
+  const all = !ranges && !Array.isArray(scope.sections);
+  if (!ranges && !all) {
     const known = new Set(ref.sections.map((s) => s.id));
     const unknown = scope.sections.filter((s) => !known.has(s));
     if (unknown.length) fail(`scope names unknown sections ${unknown.join(', ')} - valid: ${[...known].join(', ')}`);
   }
-  const inScope = (id) => all || scope.sections.includes(ref.elements[id]?.section);
+  const rangeOf = (id) => ranges?.find((g) => num(id) >= g.from && num(id) <= g.to);
+  const inScope = (id) => (ranges ? !!rangeOf(id) : all || scope.sections.includes(ref.elements[id]?.section));
   const rootOf = Object.fromEntries(ref.sections.map((s) => [s.id, s.root]));
+  // x/y are measured from the part's own root (a range's first element), else from the section root.
+  const originOf = (id) => rangeOf(id)?.root || rootOf[ref.elements[id].section];
   const ids = Object.keys(ref.elements).filter(inScope);
 
   const liveData = flag('live-data') === true;
@@ -119,14 +143,14 @@ async function main() {
         if (live && (p === 'text' || p === 'w' || p === 'h')) continue;
         check(same(p, exp, b.s[p]), catOf(p), id, p, exp, b.s[p] ?? '(none)', v);
       }
-      const rootId = rootOf[ref.elements[id].section];
+      const rootId = originOf(id);
       const r0 = R[rootId]; const b0 = B[rootId];
       const sectionLive = liveData && r0?.visible && b0?.visible && r0.r.t !== undefined && r0.r.t !== b0.r.t;
       if (id !== rootId && r0?.visible && b0?.visible && !sectionLive) {
         const [ex, ey] = [r.r.x - r0.r.x, r.r.y - r0.r.y].map((n) => +n.toFixed(2));
         const [ax, ay] = [b.r.x - b0.r.x, b.r.y - b0.r.y].map((n) => +n.toFixed(2));
-        check(same('x', ex, ax), 'layout', id, `x in section (from ${rootId})`, ex, ax, v);
-        check(same('y', ey, ay), 'layout', id, `y in section (from ${rootId})`, ey, ay, v);
+        check(same('x', ex, ax), 'layout', id, `x in part (from ${rootId})`, ex, ax, v);
+        check(same('y', ey, ay), 'layout', id, `y in part (from ${rootId})`, ey, ay, v);
       }
     }
     for (const name of ref.tokenNames || []) {
@@ -234,7 +258,9 @@ async function main() {
     return e ? `${id} ${e.tag}${e.text ? ` "${e.text.slice(0, 30)}"` : ''}` : id;
   };
   const sizes = (set) => (set.size === ref.variants.length ? 'all' : [...set].join(', ').replace(/-dark/g, ' dark'));
-  const scopeText = all ? 'all sections' : scope.sections.map((s) => `${s} ${ref.sections.find((x) => x.id === s)?.name || ''}`.trim()).join(', ');
+  const scopeText = ranges
+    ? `elements ${ranges.map((g) => (g.from === g.to ? g.root : `${g.root}..${idOf(g.to)}`)).join(', ')} (${ids.length} elements)`
+    : all ? 'all sections' : scope.sections.map((s) => `${s} ${ref.sections.find((x) => x.id === s)?.name || ''}`.trim()).join(', ');
   const extra = Object.keys(build.elements || {}).filter((id) => !ref.elements[id]);
   const lines = [
     `# Parity report - pass ${pass}`, '',
