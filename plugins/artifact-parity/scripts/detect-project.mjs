@@ -2,9 +2,13 @@
 // Detects, for any project, how its UI app runs: the app folder, framework,
 // dev command and port, and - when the app is built into a Docker image -
 // the compose project, service, rebuild commands and the URL it is served on.
-// Writes design-ref/.parity-project.json (values marked "setBy": "user" are kept).
+// Writes design-ref/.parity-project.json.
 //
-// Usage: detect-project.mjs [--project <dir>] [--app <app folder>]
+// Usage: detect-project.mjs [--project <dir>] [--app <folder>] [--container <name>] [--service <name>]
+//          [--url <served url>] [--dev-command <cmd>] [--dev-url <url>] [--build-command <cmd>] [--up-command <cmd>] [--forget]
+// Anything the user stated goes in as a flag: it wins over detection, is remembered for later
+// runs (the "user" block in the json), and the rest is detected around it. --forget clears it.
+// A named --container alone is enough: its compose labels give the project, service and app folder.
 // Exit codes: 0 detected (docker may be null), 1 no UI app found, 2 usage error.
 
 import fs from 'node:fs';
@@ -129,14 +133,34 @@ async function servedAt(ports, title) {
   return null;
 }
 
-async function findDocker(app) {
-  for (const c of composeCandidates()) {
+const contextOf = (c, s) => {
+  const ctx = typeof s.build === 'string' ? s.build : s.build?.context;
+  return ctx ? path.resolve(c.workingDir, ctx) : null;
+};
+
+// A container the user named: its compose labels give the exact project, files and service.
+function fromContainer(name) {
+  let info;
+  try { [info] = JSON.parse(docker(['inspect', name]) || '[]'); } catch { /* not found */ }
+  if (!info) return { error: `no container named "${name}" (see docker ps -a)` };
+  const l = info.Config?.Labels || {};
+  const c = {
+    project: l['com.docker.compose.project'], workingDir: l['com.docker.compose.project.working_dir'],
+    files: (l['com.docker.compose.project.config_files'] || '').split(',').filter(Boolean), source: `from the container you named`,
+  };
+  const service = l['com.docker.compose.service'];
+  if (!c.project || !c.files.length || !service) return { error: `container "${name}" was not started by docker compose, so it can't be rebuilt from here - give the rebuild command with --build-command` };
+  const svc = composeConfig(c)?.services?.[service];
+  return { c, service, context: svc ? contextOf(c, svc) : null };
+}
+
+async function findDocker(app, want = {}) {
+  for (const c of want.candidate ? [want.candidate] : composeCandidates()) {
     const cfg = composeConfig(c);
     if (!cfg?.services) continue;
-    const entry = Object.entries(cfg.services).find(([, s]) => {
-      const ctx = typeof s.build === 'string' ? s.build : s.build?.context;
-      return ctx && norm(path.resolve(c.workingDir, ctx)) === norm(app.dir);
-    });
+    const entry = Object.entries(cfg.services).find(([n, s]) => (want.service
+      ? n === want.service
+      : contextOf(c, s) && norm(contextOf(c, s)) === norm(app.dir)));
     if (!entry) continue;
     const [service, svc] = entry;
     const ports = (s) => (s.ports || []).map((p) => p.published).filter(Boolean);
@@ -157,13 +181,31 @@ async function findDocker(app) {
   return null;
 }
 
+// Values the user stated (in the brief or an answer) win over detection and are remembered.
+const USER_FLAGS = {
+  app: 'app', container: 'container', service: 'service', url: 'url',
+  'dev-command': 'devCommand', 'dev-url': 'devUrl', 'build-command': 'build', 'up-command': 'up',
+};
+
 async function main() {
   const prev = readJson(outFile) || {};
+  const user = flag('forget') === true ? {} : { ...(prev.user || {}) };
+  for (const [f, key] of Object.entries(USER_FLAGS)) {
+    const v = flag(f);
+    if (typeof v === 'string') user[key] = f === 'app' ? path.resolve(v) : v;
+  }
+
+  let named = null;
+  if (user.container) {
+    named = fromContainer(user.container);
+    if (named.error && !user.build) { console.log(`✖ ${named.error}`); process.exit(1); }
+  }
   let app;
-  if (typeof flag('app') === 'string') {
-    app = appInfo(path.resolve(flag('app')));
-    if (!app) { console.log(`✖ no UI app (Next.js, Vite, CRA, Angular, SvelteKit, Nuxt, Astro) in ${flag('app')}`); process.exit(1); }
-  } else if (prev.app?.setBy === 'user' || prev.app?.dir) {
+  const appDir = user.app || named?.context;
+  if (appDir) {
+    app = appInfo(appDir);
+    if (!app) { console.log(`✖ no UI app (Next.js, Vite, CRA, Angular, SvelteKit, Nuxt, Astro) in ${appDir}`); process.exit(1); }
+  } else if (prev.app?.dir) {
     app = appInfo(prev.app.dir) || null;
   }
   if (!app) {
@@ -176,21 +218,30 @@ async function main() {
     }
     [app] = apps;
   }
-  const detectedDocker = await findDocker(app);
-  const docker = prev.docker?.setBy === 'user' ? prev.docker : detectedDocker;
-  const result = { app: prev.app?.setBy === 'user' ? { ...app, ...prev.app } : app, docker, detectedAt: new Date().toISOString() };
+  let docker = await findDocker(app, { candidate: named?.c, service: user.service || named?.service });
+  if (!docker && (user.build || user.container)) {
+    docker = { service: user.service || null, container: user.container || null, source: 'you set it', build: null, up: null, url: null };
+  }
+  if (docker) {
+    if (user.container) docker.container = user.container;
+    for (const k of ['build', 'up', 'url']) if (user[k]) docker[k] = user[k];
+  }
+  if (user.devCommand) app.devCommand = user.devCommand;
+  if (user.devUrl) app.devUrl = user.devUrl;
+  const result = { app, docker, user, detectedAt: new Date().toISOString() };
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
   fs.writeFileSync(outFile, JSON.stringify(result, null, 2));
 
+  const mine = (k) => (user[k] ? ' (you set)' : '');
   const rel = path.relative(projectDir, app.dir) || '.';
-  console.log(`✔ app: ${rel} (${app.framework}, ${app.packageManager}) · dev: ${app.devCommand || 'no dev script'} at ${app.devUrl}`);
+  console.log(`✔ app: ${rel}${mine('app')} (${app.framework}, ${app.packageManager}) · dev: ${app.devCommand || 'no dev script'}${mine('devCommand')} at ${app.devUrl}${mine('devUrl')}`);
   if (!docker) console.log('· docker: none - this app is not built by any compose service');
   else {
-    console.log(`✔ docker: service "${docker.service}" in compose project "${docker.project}" (${docker.source})`);
-    console.log(`  container: ${docker.containers?.length ? docker.containers.join(', ') : `${docker.container || 'none'} (not created yet)`}`);
-    console.log(`  rebuild: ${docker.build}`);
-    console.log(`  restart: ${docker.up}`);
-    console.log(docker.url ? `  served at: ${docker.url}` : '  served at: unknown - start the stack, or set docker.url in design-ref/.parity-project.json');
+    console.log(`✔ docker: service "${docker.service}"${mine('service')} in compose project "${docker.project}" (${docker.source})`);
+    console.log(`  container: ${user.container ? `${user.container} (you set)` : docker.containers?.length ? docker.containers.join(', ') : `${docker.container || 'none'} (not created yet)`}`);
+    console.log(`  rebuild: ${docker.build || 'unknown - give it with --build-command'}${mine('build')}`);
+    console.log(`  restart: ${docker.up || 'unknown - give it with --up-command'}${mine('up')}`);
+    console.log(docker.url ? `  served at: ${docker.url}${mine('url')}` : '  served at: unknown - start the stack, or give it with --url');
   }
   console.log(`  saved: ${path.relative(projectDir, outFile)}`);
 }

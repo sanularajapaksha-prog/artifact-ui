@@ -5,10 +5,22 @@ Run `progress.mjs start 3`.
 ## 1. Detect how the app runs
 
 ```
-node "<ROOT>/scripts/detect-project.mjs" --project "."
+node "<ROOT>/scripts/detect-project.mjs" --project "." [user-stated values as flags]
 ```
 
-- It finds the UI app, its framework, dev command and URL, and - when a compose service builds that app - the Docker rebuild commands and the URL the container is served on. It saves all of it to `design-ref/.parity-project.json`.
+- It finds the UI app, its framework, dev command and URL, and - when a compose service builds that app - the Docker service, container, rebuild commands and the URL the container is served on. It saves all of it to `design-ref/.parity-project.json`.
+- **What the user states wins.** If the BRIEF or any user answer states one of these, pass it as a flag; detection fills in everything else around it, and the value is remembered for later runs:
+
+| The user says, for example | Flag |
+|---|---|
+| "the frontend runs in the acme-web container" | `--container acme-web` (this alone gives the service, app folder and rebuild commands) |
+| "the service is web" | `--service web` |
+| "the app is in apps/admin" | `--app apps/admin` |
+| "it's served at http://localhost:8080" | `--url http://localhost:8080` |
+| "start it with pnpm dev:local" / "dev server on :3001" | `--dev-command "pnpm dev:local"` / `--dev-url http://localhost:3001` |
+| "rebuild with ./scripts/build-fe.sh" / "restart with ..." | `--build-command "..."` / `--up-command "..."` |
+
+  If a stated value turns out wrong (the script prints ✖), tell the user exactly what was not found and ask for the right value; never silently fall back to a guess. To drop remembered values, run with `--forget`.
 - **Several apps listed:** pick the one the BRIEF points to (the one that contains the named screen). If that is unclear, run `progress.mjs wait 3 --note "which app?"` and return STATUS `needs-user` with the apps as options. Then rerun with `--app "<folder>"`.
 - Never reuse commands, ports or paths from another project; always use what this project's detection says.
 

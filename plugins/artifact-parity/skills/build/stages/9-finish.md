@@ -25,7 +25,7 @@ Read `docker` from `design-ref/.parity-project.json`.
 - **`docker` is null** (no compose service builds this app): run `progress.mjs sub 9 --note "no Docker service for this app - final check on the dev server"`, and use the pass results as the final score. Skip to step 4.
 - **Otherwise, ask first - every run, because a restart replaces the running container:**
   1. Run `progress.mjs wait 9 --note "confirm the container"` and return STATUS `needs-user`: "Your frontend runs in container `<container>` (service `<service>`, compose project `<project>`), served at `<docker url>`. I'll rebuild it with your changes, restart it, and check the design there. OK?" Options: `Yes, rebuild <container>` / `A different container` / `Skip the Docker check`.
-  2. **`A different container`:** list the project's containers (`docker ps -a --format "{{.Names}}  {{.Label \"com.docker.compose.service\"}}  {{.Status}}"`) and ask which one; rerun detection for the app that container builds, or save the user's pick in `design-ref/.parity-project.json` with `"setBy": "user"`, then ask this question again for it.
+  2. **`A different container`:** list the project's containers (`docker ps -a --format "{{.Names}}  {{.Label \"com.docker.compose.service\"}}  {{.Status}}"`) and ask which one; then rerun `detect-project.mjs --container <picked name>` (it finds that container's service, app and rebuild commands, and remembers the pick) and ask this question again for it.
   3. Only after `Yes`: run `progress.mjs sub 9 --note "docker build <service>"`, then the saved `build` command from the project root. Allow up to 15 minutes.
   4. Run `progress.mjs sub 9 --note "docker restart <service>"`, then the saved `up` command.
   5. Wait until `<docker url><path of preview_url>` answers (poll every 5s, up to 3 minutes). In `new` mode, use the confirmed `target` route, since the preview route is gone.
@@ -34,7 +34,7 @@ Read `docker` from `design-ref/.parity-project.json`.
 - **If the Docker build or restart fails:**
   1. Keep the last 15 lines of its output, most of all the lines with `error`.
   2. Run `progress.mjs wait 9 --note "docker build failed"` and return STATUS `needs-user`: "The Docker rebuild failed: <main error line>. How should I rebuild the frontend?" Options: `Retry` / `I'll give my rebuild command` / `Skip the Docker check`.
-  3. On a command from the user, save it in `design-ref/.parity-project.json` as `docker.build` (and `docker.up` if given) with `"setBy": "user"`, then run it. Later runs use it without asking.
+  3. On a command from the user, rerun `detect-project.mjs --build-command "<command>"` (and `--up-command "<command>"` if given) so it is remembered, then run it. Later runs use it without asking.
   4. On `Skip the Docker check`, finish with the pass results and say the Docker build was not checked.
 - **If the Docker score is lower than the last pass:** the build differs from the dev server (for example a production CSS purge, a missing env value, or a different base path). Put the rows from `report.md` in `left_rows` with that likely cause. Do not claim the pass score as final.
 
