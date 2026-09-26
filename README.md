@@ -134,6 +134,14 @@ Each project keeps its build notes in `design-ref/`; delete that folder if you d
 - Focus and active states aren't measured yet.
 - Parts that appear only after typing, dragging or a long hover can't be captured; parts behind clicks can.
 
+## Working on the plugin itself
+
+- [CLAUDE.md](CLAUDE.md) - what this repository is and the rules that hold it together
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - the three layers, data flow diagrams and every file contract
+- [docs/DECISIONS.md](docs/DECISIONS.md) - why each rule exists; read the entry before changing a rule
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) - the edit loop, testing, the release checklist and what's next
+- [CHANGELOG.md](CHANGELOG.md) - version history
+
 ## License
 
 MIT - see [LICENSE](LICENSE).
