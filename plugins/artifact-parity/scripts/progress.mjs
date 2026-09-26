@@ -174,9 +174,16 @@ function cmdPreflight() {
   st.endedAt = nowIso();
   const dur = fmtDuration(Date.parse(st.endedAt) - Date.parse(st.startedAt));
   if (missing.length) {
+    // PENDING.json lists scripts this plugin version does not ship yet (work in progress).
+    let pending = [];
+    try { pending = JSON.parse(fs.readFileSync(path.join(root, 'scripts', 'PENDING.json'), 'utf8')).scripts || []; } catch { /* none */ }
+    const notYetBuilt = missing.every((f) => pending.includes(f));
     st.status = 'failed';
     state.failed = true;
-    emit(state, `${label(1)} ${G.fail}${details(`missing ${missing.join(', ')}`, 'update the plugin')}`);
+    const why = notYetBuilt
+      ? details(`not in this plugin version yet: ${missing.join(', ')}`, 'nothing to fix on your side')
+      : details(`missing ${missing.join(', ')}`, 'plugin files damaged: reinstall the plugin');
+    emit(state, `${label(1)} ${G.fail}${why}`);
     process.exit(1);
   }
   st.status = 'done';

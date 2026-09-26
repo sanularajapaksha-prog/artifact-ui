@@ -99,21 +99,25 @@ claude plugin update artifact-parity@artifact-tools
 
 3. Restart Claude Code. This is required: the helper agent only loads when a session starts.
 
-## Status (v0.4.0)
+## Status (v0.5.0)
 
 | Part | State |
 |---|---|
 | Plugin + marketplace manifests | done (step 1) |
 | `skills/scout` + `scripts/list-skills.mjs` | done (step 2), works now |
-| Progress lines, log, status bar (`skills/statusbar`, `progress.mjs`, `statusline*.mjs`) | done (step 3), works now |
-| Quiet mode, plain-words description, part selection (`skills/build`, `agents/parity-worker.md`, `skills/build/stages/`) | done (step 4) |
-| `scripts/setup.mjs`, `fetch-public.mjs`, `check-source.mjs` | step 5 |
-| `scripts/capture.mjs` (+ `.jsx` harness, section ids for part selection) | step 6 |
-| `scripts/compare.mjs` (+ `--scope`) | step 7 |
+| Progress lines, log, status bar | done (step 3), works now |
+| Quiet mode, plain-words description, part selection | done (step 4) |
+| `setup.mjs` (installs Playwright + a browser, falls back to Edge/Chrome), `fetch-public.mjs`, `check-source.mjs` | done (step 5) |
+| `scripts/capture.mjs` | step 6 |
+| `scripts/compare.mjs` | step 7 |
 | Full run on a real screen | step 8 |
 
-What happens today when you run the build command: it stops at stage 1 with this line, which is expected until steps 5-7 are added.
+**The build command is not usable yet.** It stops at stage 1 on purpose, before touching your code, with this line:
 
 ```
-━━ [1/9] Preflight ✖ failed — missing setup.mjs, fetch-public.mjs, check-source.mjs, capture.mjs, compare.mjs · update the plugin
+━━ [1/9] Preflight ✖ failed — not in this plugin version yet: capture.mjs, compare.mjs · nothing to fix on your side
 ```
+
+Nothing is wrong with your install. `git pull` or reinstalling won't help; the next plugin versions add these two scripts.
+
+**First-run download:** on the first real run, setup downloads Playwright and a browser (about 150 MB) into the plugin's data folder, not into your project. If a proxy blocks the browser download, it uses the Microsoft Edge or Google Chrome already on your PC.

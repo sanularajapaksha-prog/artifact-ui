@@ -1,0 +1,4 @@
+{
+  "scripts": ["capture.mjs", "compare.mjs"],
+  "note": "Measuring scripts still being built. A later plugin version adds them and removes this file."
+}

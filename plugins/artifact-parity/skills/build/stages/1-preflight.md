@@ -7,7 +7,9 @@ node "<ROOT>/scripts/progress.mjs" preflight --plugin-root "<ROOT>" --data "<DAT
 ```
 
    - If the facts include a screen name, add `--screen "<SCREEN>"` to the command.
-   - **If it exits with a non-zero code, stop.** Return STATUS `failed` with the line it printed. REASON: the plugin's scripts are missing, so the user should update the plugin. Do nothing else.
+   - **If it exits with a non-zero code, stop.** Return STATUS `failed` with the line it printed, and do nothing else. Base REASON on the line's wording:
+     - **"not in this plugin version yet":** REASON is "This plugin version doesn't include its measuring scripts yet, so the run stopped before building anything. Nothing is wrong with your install; git pull or reinstalling won't help. Wait for the next plugin version."
+     - **"plugin files damaged":** REASON is "Some plugin files are missing. Reinstall the plugin, restart Claude Code, and run the command again."
 2. **Install or verify dependencies.** This is safe to repeat and fast when already installed:
 
 ```
