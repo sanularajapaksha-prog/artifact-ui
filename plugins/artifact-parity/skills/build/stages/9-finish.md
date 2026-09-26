@@ -57,6 +57,12 @@ Read `docker` from `design-ref/.parity-project.json`.
   4. On `Skip the Docker check`, finish with the pass results and say the Docker build was not checked.
 - **If the Docker score is lower than the last pass:** the build differs from the dev server (for example a production CSS purge, a missing env value, or a different base path). Put the rows from `report.md` in `left_rows` with that likely cause. Do not claim the pass score as final.
 
+## 4b. App states not reached
+
+If the final `report.md` has `state not reached` rows, run `progress.mjs wait 9 --note "app state not reached"` and return STATUS `needs-user`: "The design is ported, but <n> parts only show in an app state this page isn't in: <each row's element and the class it needs>. Is there a page where it's in that state?" Options: `Here is a URL` / `A click shows it` / `Accept - the design is in the code`.
+- On a URL or click: capture and compare again there (as step 4) and use that result.
+- On `Accept`: finish; the rows stay listed in the report as `state not reached`, outside the score.
+
 ## 5. Report
 
 1. Run `progress.mjs done 9 --from-report "design-ref/<screen>" --note "<Docker <url> | dev server>"`. The score and row count come from the last compare's `result.json` (the Docker compare, or the last pass when there is no Docker); the script adds the total time and flags a stale or earlier-pass report.

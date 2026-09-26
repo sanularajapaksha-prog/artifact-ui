@@ -224,7 +224,8 @@ function fromReport(dir, n, extra) {
   if (expectedPass && r.pass !== expectedPass) flagsOut.push(`from the pass ${r.pass} report`);
   if (/\d+\s*(rows?|differences?)\b|\d+\s*%|clean/i.test(extra)) usage('with --from-report, --note may give a reason but no row counts, percentages or "clean" - those come from result.json');
   const rows = r.clean ? '' : `${r.rows} row${r.rows === 1 ? '' : 's'} ${n === 6 ? 'to fix' : 'left'}`;
-  return { score: r.score, note: [rows, ...flagsOut, extra].filter(Boolean).join(` ${G.dot} `) };
+  const state = r.stateRows ? `${r.stateRows} need an app state` : '';
+  return { score: r.score, note: [rows, state, ...flagsOut, extra].filter(Boolean).join(` ${G.dot} `) };
 }
 
 function cmdEnd(kind) {

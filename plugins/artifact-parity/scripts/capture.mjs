@@ -445,6 +445,48 @@ function prInit() {
     },
 
     // Buttons, tabs and toggles that change what is shown - candidates for --click.
+    // Which CSS rules give an element its ::before/::after or its animation (ref), so the build can be
+    // checked for "the rule is in your CSS but this element doesn't get it" = an app state not reached.
+    stateRules() {
+      const res = {};
+      eachRule((r) => {
+        if (!r.selectorText || !r.style) return;
+        const pseudo = /::?(before|after)\b/.test(r.selectorText);
+        const anim = r.style.animationName && r.style.animationName !== 'none' ? r.style.animationName : '';
+        if (!pseudo && !anim) return;
+        for (const part of r.selectorText.split(',')) {
+          const base = part.replace(/::?(before|after)\b/g, '').trim() || '*';
+          let els = [];
+          try { els = document.querySelectorAll(base); } catch { continue; }
+          for (const el of els) {
+            const id = el.getAttribute(attr);
+            if (!id || byId.get(id) !== el) continue;
+            (res[id] ||= []).push({ selector: part.trim().replace(/\s+/g, ' '), base, classes: [...base.matchAll(/\.([\w-]+)/g)].map((m) => m[1]), keyframes: anim });
+          }
+        }
+      });
+      return res;
+    },
+
+    stateCheck(rulesById) {
+      const selectors = new Set();
+      const keyframes = new Set();
+      eachRule((r) => {
+        if (r.selectorText) for (const p of r.selectorText.split(',')) selectors.add(p.trim().replace(/\s+/g, ' '));
+        if (r.type === CSSRule.KEYFRAMES_RULE) keyframes.add(r.name);
+      });
+      const res = {};
+      for (const [id, rules] of Object.entries(rulesById)) {
+        const el = byId.get(id);
+        if (!el) continue;
+        const inCss = rules.filter((r) => selectors.has(r.selector) || (r.keyframes && keyframes.has(r.keyframes)));
+        const applied = inCss.some((r) => { try { return el.matches(r.base); } catch { return false; } });
+        const missingClasses = [...new Set(inCss.flatMap((r) => r.classes).filter((c) => !el.classList.contains(c)))];
+        res[id] = { inCss: inCss.length > 0, applied, missingClasses, selector: inCss[0]?.selector || rules[0]?.selector };
+      }
+      return res;
+    },
+
     stateControls() {
       const res = [];
       for (const el of document.querySelectorAll('button, [role=tab], [role=button], [aria-pressed], [aria-selected], [aria-expanded], a[href^="#"]')) {
@@ -718,6 +760,9 @@ async function main() {
       version: 1, mode, target, capturedAt: new Date().toISOString(), dataDir: path.resolve(data),
       widths, variants, clicks, ...info, tokenNames, tokens, measure, motion, hover, errors: errors.slice(0, 10),
       stateControls: await page.evaluate(() => window.__pr.stateControls()),
+      ...(ref
+        ? { stateCheck: await page.evaluate((r) => window.__pr.stateCheck(r), ref.stateRules || {}) }
+        : { stateRules: await page.evaluate(() => window.__pr.stateRules()) }),
     };
     fs.writeFileSync(path.join(outDir, `${mode}.json`), JSON.stringify(result));
     const sizes = `${variants.length} screen size${variants.length > 1 ? 's' : ''}`;

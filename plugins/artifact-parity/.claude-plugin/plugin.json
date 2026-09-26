@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "artifact-parity",
   "displayName": "Artifact Parity",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Give it a claude.ai artifact link and, in plain words, what to build (all of it or one part, and where it goes). It builds the same UI in your codebase, measures fonts, spacing, colors, transparency, theme and motion against the artifact, and fixes differences in up to 3 passes. The chat shows only stage lines, your questions and the result; a helper agent does the work out of sight. Includes scout (uses your installed skills) and an optional live status bar.",
   "author": {
     "name": "Sanula"

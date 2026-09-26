@@ -34,7 +34,7 @@ const readJson = (file, what) => {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fail(`${what} not found or unreadable: ${file}`); }
 };
 
-const CATS = ['missing', 'fonts', 'theme and tokens', 'typography', 'box', 'layout', 'states', 'motion'];
+const CATS = ['missing', 'fonts', 'theme and tokens', 'typography', 'box', 'layout', 'states', 'motion', 'state not reached'];
 const CAT_OF = {
   fontFamily: 'fonts', fontWeight: 'fonts', fontStyle: 'fonts', fontLoaded: 'fonts',
   fontSize: 'typography', lineHeight: 'typography', letterSpacing: 'typography', textTransform: 'typography',
@@ -103,13 +103,22 @@ async function main() {
   const liveIds = new Set();
   let checks = 0; let passed = 0;
   const rows = new Map();
+  const STATE = 'state not reached';
   const check = (ok, cat, id, prop, exp, act, size) => {
-    checks++;
-    if (ok) { passed++; return; }
+    // "state not reached" rows are listed but kept out of the score: the design is ported, the app's data doesn't show it.
+    if (cat !== STATE) { checks++; if (ok) { passed++; return; } }
     const key = `${cat}|${id}|${prop}|${exp}|${act}`;
     if (!rows.has(key)) rows.set(key, { cat, id, prop, exp, act, sizes: new Set() });
     rows.get(key).sizes.add(size);
   };
+
+  // The rule that makes this element's ::before/::after or animation is in the build's CSS, but the element
+  // doesn't get it: an app state (data, status, selection) that the measured page isn't in.
+  const stateGap = (id) => {
+    const s = build.stateCheck?.[id];
+    return s && s.inCss && !s.applied ? s : null;
+  };
+  const stateText = (s) => `${s.selector} is in your CSS but not on this element${s.missingClasses.length ? ` - needs class ${s.missingClasses.join(' ')}` : ''}, which your app sets only in some state`;
 
   for (const id of ids) {
     const n = build.duplicates?.[id];
@@ -134,7 +143,8 @@ async function main() {
       // A pseudo-element the build lacks entirely is one row, not one row per property.
       const missingPseudo = new Set(['::before', '::after'].filter((ps) => r.s[`${ps} content`] !== undefined && b.s[`${ps} content`] === undefined));
       for (const ps of missingPseudo) {
-        check(false, 'box', id, ps, `present (content ${r.s[`${ps} content`]}, ${r.s[`${ps} animationDuration`] !== '0s' ? `animated ${r.s[`${ps} animationDuration`]}` : 'static'})`, 'missing', v);
+        const gap = stateGap(id);
+        check(false, gap ? STATE : 'box', id, ps, `present (content ${r.s[`${ps} content`]}, ${r.s[`${ps} animationDuration`] !== '0s' ? `animated ${r.s[`${ps} animationDuration`]}` : 'static'})`, gap ? stateText(gap) : 'missing', v);
       }
       for (const [p, exp] of Object.entries(r.s)) {
         if (missingPseudo.has(p.split(' ')[0])) continue;
@@ -183,7 +193,8 @@ async function main() {
       if (j < 0) j = pool.length ? 0 : -1;
       const label = `animation ${i + 1}${ra.pseudo ? ` (${ra.pseudo})` : ''}`;
       if (j < 0) {
-        check(false, 'motion', id, label, `${ra.duration}ms, delay ${ra.delay}ms, ${times(ra.iterations)}`, 'none', '-');
+        const gap = stateGap(id);
+        check(false, gap ? STATE : 'motion', id, label, `${ra.duration}ms, delay ${ra.delay}ms, ${times(ra.iterations)}`, gap ? stateText(gap) : 'none', '-');
         return;
       }
       const ba = pool.splice(j, 1)[0];
@@ -198,7 +209,9 @@ async function main() {
   if (!measured) fail('nothing in scope is visible in the artifact at load (for example a closed tab), so nothing could be measured');
 
   const list = [...rows.values()].sort((a, b) => CATS.indexOf(a.cat) - CATS.indexOf(b.cat) || a.id.localeCompare(b.id));
-  const clean = list.length === 0;
+  const stateRows = list.filter((r) => r.cat === STATE);
+  const designRows = list.filter((r) => r.cat !== STATE);
+  const clean = designRows.length === 0;
   let pct = Math.floor((passed / checks) * 100);
   if (!clean && pct === 100) pct = 99;
   const score = clean ? `100% CLEAN (${passed}/${checks})` : `${pct}% (${passed}/${checks})`;
@@ -264,14 +277,14 @@ async function main() {
   const extra = Object.keys(build.elements || {}).filter((id) => !ref.elements[id]);
   const lines = [
     `# Parity report - pass ${pass}`, '',
-    `Score: ${score}${clean ? '' : ` · ${list.length} rows to fix`}`,
+    `Score: ${score}${clean ? '' : ` · ${designRows.length} rows to fix`}${stateRows.length ? ` · ${stateRows.length} rows need an app state (not in the score)` : ''}`,
     `Scope: ${scopeText}${scope.brief ? ` ("${scope.brief}")` : ''}`,
     `Screen sizes: ${ref.variants.map((v) => v.replace('-dark', ' dark')).join(', ')} · hover measured at ${hoverSize}`,
     'Rules: colors exact, px values within 0.5px, x/y measured from the section root.',
   ];
   if (liveData) lines.push(`Live data: ${liveIds.size} elements show real data instead of the artifact's sample text - their text and size were not checked; their styles were. x/y is skipped in sections whose content differs.`);
   if (extra.length) lines.push(`Note: the build has data-ref ids the artifact doesn't: ${extra.slice(0, 10).join(', ')}${extra.length > 10 ? ' ...' : ''}`);
-  if (clean) lines.push('', 'CLEAN - no differences.');
+  if (clean) lines.push('', stateRows.length ? `CLEAN - no design differences. ${stateRows.length} rows below need an app state the measured page is not in.` : 'CLEAN - no differences.');
   for (const cat of CATS) {
     const catRows = list.filter((r) => r.cat === cat);
     if (!catRows.length) continue;
@@ -284,12 +297,13 @@ async function main() {
   fs.writeFileSync(path.join(dir, 'report.md'), `${lines.join('\n')}\n`);
   // Machine-readable result: progress.mjs --from-report builds the stage line from this, not from anyone's summary.
   fs.writeFileSync(path.join(dir, 'result.json'), JSON.stringify({
-    pass, score, pct: clean ? 100 : pct, passed, checks, rows: list.length, clean, scope: scopeText,
+    pass, score, pct: clean ? 100 : pct, passed, checks, rows: designRows.length, stateRows: stateRows.length, clean, scope: scopeText,
     buildCapturedAt: build.capturedAt || null, comparedAt: new Date().toISOString(),
   }, null, 2));
 
   console.log(`score: ${score}`);
-  console.log(clean ? 'CLEAN · 0 differences' : `${list.length} rows to fix · ${path.join(dir, 'report.md')}${Object.keys(crops).length ? ` · ${Object.keys(crops).length} crops` : ''}`);
+  const stateLine = stateRows.length ? ` · ${stateRows.length} rows need an app state (listed, not scored)` : '';
+  console.log(clean ? `CLEAN · 0 differences${stateLine}` : `${designRows.length} rows to fix${stateLine} · ${path.join(dir, 'report.md')}${Object.keys(crops).length ? ` · ${Object.keys(crops).length} crops` : ''}`);
 }
 
 main().catch((e) => {
