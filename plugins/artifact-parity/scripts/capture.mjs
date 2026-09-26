@@ -341,6 +341,16 @@ function prInit() {
         elements[id] = { tag: el.tagName.toLowerCase(), text: own(el), section: si >= 0 ? sections[si].id : 's-00', depth };
       }
       if (wrapperRoot) sections.unshift({ id: 's-00', name: 'Page wrapper', root: wrapperRoot, hiddenAtLoad: false });
+      // Subtree extent per element (ids are in document order, so a subtree is one range) and a
+      // name for it - so a part smaller than its section can be scoped as "r-022..r-055".
+      for (const [id, el] of byId) {
+        const inner = el.querySelectorAll(`[${attr}]`);
+        elements[id].end = inner.length ? inner[inner.length - 1].getAttribute(attr) : id;
+        elements[id].count = inner.length + 1;
+        const cls = typeof el.className === 'string' ? el.className.split(/\s+/).find((c) => c && !/[:[\]/]/.test(c)) : '';
+        const label = el.getAttribute('data-testid') || el.getAttribute('aria-label') || (el.id ? `#${el.id}` : '') || (cls ? `.${cls}` : '');
+        if (label) elements[id].label = label.slice(0, 40);
+      }
       return { sections, elements };
     },
 
@@ -586,13 +596,26 @@ function refMap(result) {
       lines.push(`- "${c.text}"${c.selector ? ` (${c.selector})` : ''}${c.toggle ? ` · toggle, ${c.on ? 'on' : 'off'} now` : ''}${c.id ? ` · ${c.id}` : ''}`);
     }
   }
+  // Named subtrees inside sections: the ranges to use for "elements" when the part is smaller than a section.
+  const sectionSize = Object.fromEntries(sections.map((s) => [s.id, Object.values(elements).filter((e) => e.section === s.id).length]));
+  const strong = (l) => l && !l.startsWith('.');
+  const parts = Object.entries(elements)
+    .filter(([id, e]) => e.label && e.count >= 5 && e.count < sectionSize[e.section] && seen(id) && !sections.some((s) => s.root === id))
+    .sort(([a, x], [b, y]) => Number(strong(y.label)) - Number(strong(x.label)) || (a < b ? -1 : 1))
+    .slice(0, 40)
+    .sort(([a], [b]) => (a < b ? -1 : 1));
+  if (parts.length) {
+    lines.push('', '## Parts', '', 'Named groups inside the sections. When the part to build is one of these (or smaller than its section), scope it with "elements": ["<first>..<last>"].', '');
+    for (const [id, e] of parts) lines.push(`- ${e.label} · ${e.tag}${e.text ? ` "${e.text}"` : ''} · [${id}..${e.end} · ${e.count}] in ${e.section}`);
+  }
   for (const s of sections) {
     const ids = Object.keys(elements).filter((id) => elements[id].section === s.id);
     lines.push('', `## ${s.id} · ${s.name} · ${ids.length} elements${s.hiddenAtLoad ? ' · hidden at load' : ''}`);
     for (const id of ids) {
       const e = elements[id];
       const marks = [hover[id] && '(hover)', result.motion[id] && '(motion)', !seen(id) && '(hidden)'].filter(Boolean).join(' ');
-      lines.push(`${'  '.repeat(Math.min(e.depth, 8))}- ${id} ${e.tag}${e.text ? ` "${e.text}"` : ''}${marks ? ` ${marks}` : ''}`);
+      const tree = e.count >= 5 ? ` [${id}..${e.end} · ${e.count}]` : '';
+      lines.push(`${'  '.repeat(Math.min(e.depth, 8))}- ${id} ${e.tag}${e.label ? ` ${e.label}` : ''}${e.text ? ` "${e.text}"` : ''}${tree}${marks ? ` ${marks}` : ''}`);
     }
   }
   return `${lines.join('\n')}\n`;

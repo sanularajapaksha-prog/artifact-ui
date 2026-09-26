@@ -27,7 +27,7 @@ node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode ref --target "<source_f
 
 - **BRIEF names a part** (for example "only the pricing cards"): match it to `ref-map.md`, then write `design-ref/<screen>/scope.json`.
   - If the part is a whole section, use `"sections"`.
-  - If it is **smaller than its section** (a rail, a card group, a toolbar inside a bigger section), use `"elements"` with the part's subtree as a range - its first id to its last descendant's id, in `ref-map.md` order. Compare then checks only that part and measures x/y from its first element. **Never scope a whole section to cover a small part**: everything else in the section would be counted, and the score could never reach 100%.
+  - If it is **smaller than its section** (a rail, a card group, a toolbar inside a bigger section), use `"elements"` with the part's subtree range. Take it from the **Parts** list in `ref-map.md` (`[r-023..r-055 · 33]`), or from the `[first..last · count]` shown on the element's own line. Pick the **smallest** named part that holds everything the BRIEF names - not its wrapper: a wrapper such as a full-width strip or panel is sized by the page, so its width would be counted as the part's. Compare then checks only that part and measures x/y from its first element. **Never scope a whole section to cover a small part**: everything else in the section would be counted, and the score could never reach 100%.
 
 ```
 { "brief": "<the user's words>", "sections": ["<section id>"], "elements": ["r-022..r-055"], "clicks": ["<ref clicks, if any>"] }
