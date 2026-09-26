@@ -259,6 +259,13 @@ function prInit() {
   ];
   const HOVER_PROPS = ['color', 'backgroundColor', 'backgroundImage', 'borderTopColor', 'boxShadow', 'opacity', 'transform', 'textDecorationLine', 'outlineColor'];
   const COLOR = new Set(['color', 'backgroundColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor', 'outlineColor', 'fill', 'stroke']);
+  // ::before / ::after carry rings, glows, underlines and moving highlights; measured on their host element.
+  const PSEUDO_PROPS = [
+    'content', 'display', 'position', 'top', 'right', 'bottom', 'left', 'width', 'height',
+    'borderTopWidth', 'borderTopStyle', 'borderTopColor', 'borderTopLeftRadius',
+    'backgroundColor', 'backgroundImage', 'opacity', 'transform', 'boxShadow',
+    'animationDuration', 'animationTimingFunction', 'animationDelay', 'animationIterationCount',
+  ];
 
   let ctx;
   // One format for every color (rgb, oklch, color(), hex): rgba(r,g,b,a) in sRGB.
@@ -386,6 +393,11 @@ function prInit() {
         s.w = r.width;
         s.h = r.height;
         if (el.tagName.toLowerCase() === 'svg') { s.fill = nc(cs.fill); s.stroke = nc(cs.stroke); s.icon = iconSig(el); }
+        for (const pseudo of ['::before', '::after']) {
+          const ps = getComputedStyle(el, pseudo);
+          if (!ps.content || ps.content === 'none' || ps.content === 'normal') continue;
+          for (const p of PSEUDO_PROPS) s[`${pseudo} ${p}`] = COLOR.has(p) ? nc(ps[p]) : ps[p];
+        }
         // t = fingerprint of all text inside, so compare --live-data can tell data-driven elements apart.
         res[id] = { visible: true, s, r: { x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: r.height, t: hash(el.textContent.replace(/\s+/g, ' ').trim()) } };
       }
@@ -479,18 +491,18 @@ function prInit() {
         if (a.constructor?.name === 'CSSTransition') continue;
         const eff = a.effect;
         const el = eff?.target;
-        if (!el || eff.pseudoElement || !el.getAttribute) continue;
+        if (!el || !el.getAttribute) continue;
         const id = el.getAttribute(attr);
         if (!id || byId.get(id) !== el) continue;
         const t = eff.getTiming();
         const kf = eff.getKeyframes().map((k) => Object.fromEntries(Object.keys(k).sort()
           .filter((key) => key !== 'composite' && key !== 'computedOffset').map((key) => [key, k[key]])));
         (res[id] ||= []).push({
-          duration: t.duration, delay: t.delay, easing: t.easing, iterations: t.iterations,
+          pseudo: eff.pseudoElement || '', duration: t.duration, delay: t.delay, easing: t.easing, iterations: t.iterations,
           direction: t.direction, fill: t.fill, keyframes: JSON.stringify(kf),
         });
       }
-      for (const list of Object.values(res)) list.sort((x, y) => (x.keyframes < y.keyframes ? -1 : 1));
+      for (const list of Object.values(res)) list.sort((x, y) => (x.pseudo + x.keyframes < y.pseudo + y.keyframes ? -1 : 1));
       return res;
     },
   };

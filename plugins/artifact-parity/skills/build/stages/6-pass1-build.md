@@ -29,7 +29,9 @@ Run `progress.mjs start 6`.
    - use the artifact's exact classes and styles
    - add its `data-ref`
 7. **Port motion and states.**
+   - If stage 4 chose a skill for the motion part, read its `SKILL.md` now and follow it for how motion is written in this project; the artifact's values still win.
    - Copy `@keyframes` verbatim. For JS-driven motion, use the same library and the same values: duration, delay, easing or spring settings, stagger, and trigger (load, hover, scroll, in-view).
+   - **Pseudo-element motion** (`::before`/`::after` rings, halos, shimmers, moving highlights): copy the pseudo rule and its `@keyframes` exactly, including `content`, `inset`, `border`, `opacity`, `transform` and the class that switches it on for a state. In a Tailwind or CSS-in-JS project, put it in the app's own stylesheet (or the component's CSS module) scoped under the component's root class; don't approximate it with a different element or library. Keep the artifact's `prefers-reduced-motion` fallback too.
    - Port hover, focus, active, disabled, selected and open/closed styles.
 8. **Check nothing broke.** If the app has a `typecheck`, `lint` or `tsc` script, run it for the app. Fix errors in files you changed; never silence them.
 9. **Measure.**

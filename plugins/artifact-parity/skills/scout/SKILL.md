@@ -85,7 +85,7 @@ Then wait for the reply:
 npx -y skills find <search words>
 ```
 
-   It prints lines like `owner/repo@skill 15.1K installs` followed by a skills.sh link.
+   It prints lines like `owner/repo@skill 15.1K installs` followed by a skills.sh link. Many words can return nothing (`css keyframes animation` finds nothing while `css animation` does): if a search prints no `installs` lines, retry with the 2 most specific words, then with 1.
 2. **Pick at most 3 candidates per part.** A candidate must clearly cover the part's technology and version (a Tailwind v4 part needs a v4 skill, not a v3 or Expo one). Prefer 1K+ installs and well-known sources. For artifact builds, the Step 4 rule applies: no design-taste skills.
 3. **Ask the user to pick.** One question per part. Each option is `owner/repo@skill · <installs> installs`, with the skills.sh link as its description, plus a last option `Skip this part`. If no candidate qualifies, say so and offer only `Skip this part`.
 4. **Install only the picked skill:**

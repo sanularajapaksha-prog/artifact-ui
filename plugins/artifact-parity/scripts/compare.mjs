@@ -45,7 +45,8 @@ const CAT_OF = {
   transitionProperty: 'motion', transitionDuration: 'motion', transitionTimingFunction: 'motion', transitionDelay: 'motion',
   animationDuration: 'motion', animationTimingFunction: 'motion', animationDelay: 'motion', animationIterationCount: 'motion',
 };
-const catOf = (p) => CAT_OF[p] || 'box';
+// "::after opacity" is judged like "opacity"; pseudo-element animation timing counts as motion.
+const catOf = (p) => CAT_OF[p.replace(/^::(before|after) /, '')] || 'box';
 
 const NUM = /-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?(px)?/gi;
 function same(prop, a, b) {
@@ -106,9 +107,15 @@ async function main() {
       // artifact's sample keeps its style checks but skips text and size.
       const live = liveData && r.r.t !== undefined && r.r.t !== b.r.t;
       if (live) liveIds.add(id);
+      // A pseudo-element the build lacks entirely is one row, not one row per property.
+      const missingPseudo = new Set(['::before', '::after'].filter((ps) => r.s[`${ps} content`] !== undefined && b.s[`${ps} content`] === undefined));
+      for (const ps of missingPseudo) {
+        check(false, 'box', id, ps, `present (content ${r.s[`${ps} content`]}, ${r.s[`${ps} animationDuration`] !== '0s' ? `animated ${r.s[`${ps} animationDuration`]}` : 'static'})`, 'missing', v);
+      }
       for (const [p, exp] of Object.entries(r.s)) {
-        const side = p.match(/^border(Top|Right|Bottom|Left)Color$/);
-        if (side && r.s[`border${side[1]}Width`] === '0px') continue;
+        if (missingPseudo.has(p.split(' ')[0])) continue;
+        const side = p.match(/^(::(?:before|after) )?border(Top|Right|Bottom|Left)Color$/);
+        if (side && r.s[`${side[1] || ''}border${side[2]}Width`] === '0px') continue;
         if (live && (p === 'text' || p === 'w' || p === 'h')) continue;
         check(same(p, exp, b.s[p]), catOf(p), id, p, exp, b.s[p] ?? '(none)', v);
       }
@@ -141,17 +148,18 @@ async function main() {
     }
   }
 
-  const FIELDS = ['keyframes', 'duration', 'delay', 'easing', 'iterations', 'direction', 'fill'];
+  const FIELDS = ['pseudo', 'keyframes', 'duration', 'delay', 'easing', 'iterations', 'direction', 'fill'];
   const iter = (n) => (n == null ? 'infinite' : n);
+  const times = (n) => (n == null ? 'infinite' : `${n}x`);
   for (const [id, list] of Object.entries(ref.motion || {})) {
     if (!inScope(id)) continue;
     const pool = [...(build.motion?.[id] || [])];
     list.forEach((ra, i) => {
       let j = pool.findIndex((b) => b.keyframes === ra.keyframes);
       if (j < 0) j = pool.length ? 0 : -1;
-      const label = `animation ${i + 1}`;
+      const label = `animation ${i + 1}${ra.pseudo ? ` (${ra.pseudo})` : ''}`;
       if (j < 0) {
-        check(false, 'motion', id, label, `${ra.duration}ms, delay ${ra.delay}ms, ${iter(ra.iterations)}x`, 'none', '-');
+        check(false, 'motion', id, label, `${ra.duration}ms, delay ${ra.delay}ms, ${times(ra.iterations)}`, 'none', '-');
         return;
       }
       const ba = pool.splice(j, 1)[0];

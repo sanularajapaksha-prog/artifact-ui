@@ -6,7 +6,7 @@ Run `progress.mjs start 4`.
 
 - the project's UI framework
 - its styling system, for example Tailwind with its major version, or CSS modules
-- each animation library the artifact uses
+- **motion, whenever the artifact moves at all** - search the artifact source for `@keyframes`, `animation`, `transition`, `::before`/`::after` with animation, and animation libraries. Name the part by what it actually uses and how it must be ported in this project, for example `animation: framer-motion springs + stagger`, `animation: GSAP ScrollTrigger`, or `animation: CSS @keyframes loops on ::after pseudo-elements in React + Tailwind v4`. A CSS-only artifact still gets this part; don't drop it because no library is used.
 - the icon or asset library the artifact uses
 
 **Two overrides, because you are running inside a build:**
