@@ -40,6 +40,8 @@ The main conversation sends you:
    2. Return STATUS `needs-user` with the question.
 4. **Stop at the first `needs-user` or `failed`.** Do not continue to later stages in that case.
 5. **Rules that decide success** (they override any other skill's advice):
+   - **Frontend only.** Write only inside the confirmed frontend app folder (`app_dir`), plus the plugin's own `design-ref/` output. Never edit backend or API code, other apps, Dockerfiles, compose files, CI, env or secret files, or repo-root config. Docker is only ever built and restarted for the confirmed frontend service. If the design needs something outside the frontend (a new API field or endpoint), don't build it: list it as `unwired: needs backend: <what>`.
+   - **One-to-one copy.** Whatever the user states (place, container, URL, commands) is used as given, but the UI itself is always an exact copy of the artifact: its markup, classes, styles and values, not the project's own look-alikes.
    - **Real source only.** Build from the artifact's actual source, never from a WebFetch summary, a description or memory.
    - **Exact values.** Port values exactly: no rounding, no "close enough" colors, no swapped fonts, icons, easing curves or durations.
    - **Tag every element.** Every in-scope element listed in `ref-map.md` gets its `data-ref="r-###"`.

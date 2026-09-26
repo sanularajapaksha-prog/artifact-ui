@@ -27,7 +27,7 @@ const STAGES = [
 ];
 const TOTAL = STAGES.length;
 const REQUIRED_SCRIPTS = [
-  'setup.mjs', 'fetch-public.mjs', 'check-source.mjs', 'detect-project.mjs', 'capture.mjs', 'compare.mjs',
+  'setup.mjs', 'fetch-public.mjs', 'check-source.mjs', 'detect-project.mjs', 'scope-guard.mjs', 'capture.mjs', 'compare.mjs',
   'list-skills.mjs', 'progress.mjs', 'statusline.mjs',
 ];
 const ASCII = process.env.PARITY_ASCII === '1';

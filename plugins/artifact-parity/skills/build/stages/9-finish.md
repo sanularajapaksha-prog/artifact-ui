@@ -18,11 +18,24 @@ If NOTES has `leftovers`:
 3. Run `progress.mjs wait 9 --note "delete leftovers?"` and return STATUS `needs-user`: "An earlier run created <paths>, which this run replaces. Delete them?" Mark untracked paths "(not in git - can't be recovered)". Options: `Delete them` / `Keep them`.
 4. Delete only after `Delete them`, then run the app's typecheck to make sure nothing referenced them.
 
-## 3. Rebuild with Docker and measure there
+## 3. Frontend-only check
+
+Before rebuilding anything, prove the run stayed inside the frontend app:
+
+```
+node "<ROOT>/scripts/scope-guard.mjs" --check --app "<app_dir>" --out "design-ref/<screen>"
+```
+
+- `✔ only frontend files changed`, or `not in a git repo`: continue.
+- `✖ … changed outside the frontend app`: run `progress.mjs wait 9 --note "files changed outside the frontend"` and return STATUS `needs-user` with the listed files: "This run changed files outside the frontend app: <files>. Revert them?" Options: `Revert them` / `Keep them`.
+  - `Revert them`: run the same command with `--revert` instead of `--check`. It reverts only files that were clean before the run; files that already had the user's changes are listed for the user to fix by hand. Then run the app's typecheck.
+  - `Keep them`: continue, and list them in NOTES as `outside_frontend`.
+
+## 4. Rebuild with Docker and measure there
 
 Read `docker` from `design-ref/.parity-project.json`.
 
-- **`docker` is null** (no compose service builds this app): run `progress.mjs sub 9 --note "no Docker service for this app - final check on the dev server"`, and use the pass results as the final score. Skip to step 4.
+- **`docker` is null** (no compose service builds this app): run `progress.mjs sub 9 --note "no Docker service for this app - final check on the dev server"`, and use the pass results as the final score. Skip to step 5.
 - **Otherwise, ask first - every run, because a restart replaces the running container:**
   1. Run `progress.mjs wait 9 --note "confirm the container"` and return STATUS `needs-user`: "Your frontend runs in container `<container>` (service `<service>`, compose project `<project>`), served at `<docker url>`. I'll rebuild it with your changes, restart it, and check the design there. OK?" Options: `Yes, rebuild <container>` / `A different container` / `Skip the Docker check`.
   2. **`A different container`:** list the project's containers (`docker ps -a --format "{{.Names}}  {{.Label \"com.docker.compose.service\"}}  {{.Status}}"`) and ask which one; then rerun `detect-project.mjs --container <picked name>` (it finds that container's service, app and rebuild commands, and remembers the pick) and ask this question again for it.
@@ -38,7 +51,7 @@ Read `docker` from `design-ref/.parity-project.json`.
   4. On `Skip the Docker check`, finish with the pass results and say the Docker build was not checked.
 - **If the Docker score is lower than the last pass:** the build differs from the dev server (for example a production CSS purge, a missing env value, or a different base path). Put the rows from `report.md` in `left_rows` with that likely cause. Do not claim the pass score as final.
 
-## 4. Report
+## 5. Report
 
 1. Run `progress.mjs done 9 --score "<final score>" --note "<Docker <url> | dev server>"`. The script adds the total time.
-2. **NOTES:** add `files` (every file created or changed), `final_score`, `measured_on` (the Docker URL or "dev server"), `deleted` (leftovers removed, or none), `unwired` and `kept_extra` (enhance mode), and `left_rows` (from the final compare, or "none").
+2. **NOTES:** add `files` (every file created or changed), `final_score`, `measured_on` (the Docker URL or "dev server"), `deleted` (leftovers removed, or none), `outside_frontend` (or none), `unwired` and `kept_extra` (enhance mode), and `left_rows` (from the final compare, or "none").

@@ -6,6 +6,8 @@ Run `progress.mjs start 6`.
 
 **Where to build:** only at the place the user confirmed in stage 3 - `target_files` in `enhance` mode, `target` in `new` mode. Never somewhere else, and never in a second copy.
 
+**Frontend only:** every file you create or change is inside `app_dir`. Fonts, global CSS, routes and libraries go in the app's own files. If the design needs data the frontend doesn't have (a new API field or endpoint), don't touch the backend: render the artifact's content for it and add `needs backend: <what>` to `unwired`.
+
 1. **Read the plan inputs.** Read the artifact source once, fully. Then read `design-ref/<screen>/scope.json` and the in-scope part of `ref-map.md`. Build only the in-scope sections. In `enhance` mode, also read every file in `target_files` fully before changing anything.
 2. **Read the chosen skills.** Read the `SKILL.md` of each skill listed in the facts. Apply each one only to its own part. The artifact's values and these rules always win over a skill's advice.
 3. **Set up global prerequisites first.** These cascade into everything:

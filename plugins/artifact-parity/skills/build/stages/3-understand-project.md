@@ -80,8 +80,17 @@ node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode login --target "<previe
   1. Run `progress.mjs wait 3 --note "install <library>?"`.
   2. Return STATUS `needs-user`. The QUESTION names the library and why it is needed. Options: `Install it` / `Don't install`.
   3. When resumed with the answer, run `progress.mjs start 3` and continue.
+  4. Install it from `app_dir` with the app's own package manager, so only the frontend's package files change.
 - **Dev server:** start the detected dev command in the background from the app folder, or reuse it if it is already running. Check that `preview_url` loads.
 - **Leftovers:** if an earlier run of this screen created a separate component that this run replaces (for example a folder built before enhance mode existed), list those paths in NOTES as `leftovers`. Do not delete them here; stage 9 asks.
+
+## 7. Frontend-only baseline
+
+The build may change files only inside `app_dir` (and `design-ref/`). The confirmed place must be inside `app_dir`; if it isn't, say so and ask again. Before anything is built, snapshot the git state so stage 9 can prove it:
+
+```
+node "<ROOT>/scripts/scope-guard.mjs" --save --app "<app_dir>" --out "design-ref/<screen>"
+```
 
 ## On success
 
