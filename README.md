@@ -1,140 +1,139 @@
-# artifact-tools (Claude Code plugin marketplace)
+# artifact-parity
 
-Contains one plugin: **artifact-parity**. It rebuilds a claude.ai artifact inside your codebase, then measures the result against the artifact. It checks fonts, sizes, line-height, letter-spacing, spacing, colors, transparency, theme, icons, hover states and motion, and fixes the differences in up to 3 passes.
+Turn a claude.ai artifact into real UI in your own project - measured, not eyeballed.
 
-It also includes **scout**. Scout picks your installed skills for each part of a task. When a part has no skill, it tells you exactly what skill is needed, and can search skills.sh and install the one you pick - never anything you did not pick.
+Give Claude Code an artifact link and, in plain words, what to build and where. The plugin builds the same UI in your codebase (or enhances the matching component you already have), measures fonts, spacing, colors, transparency, theme, hover states and motion against the artifact, and fixes the differences in up to three passes.
 
-## Install (one time)
+This repository is a Claude Code plugin marketplace named **artifact-tools** with one plugin, **artifact-parity**.
 
-1. Unzip this folder somewhere permanent, for example `C:\dev\claude-plugins\artifact-tools`.
-2. In PowerShell, run the two commands below. Use forward slashes in the path.
+## Requirements
 
-```
-claude plugin marketplace add C:/dev/claude-plugins/artifact-tools
-claude plugin install artifact-parity@artifact-tools
-```
+- **Claude Code, signed in with a Claude account.** The plugin runs inside Claude Code, and it reads claude.ai artifact links through your Claude login. Without a Claude account it can't run.
+- **Node.js** (a current LTS version) for the helper scripts. The first build installs Playwright and a browser into the plugin's own data folder, not your project (about 150 MB); if that download is blocked, it uses Microsoft Edge or Google Chrome already on your computer.
+- **Optional:** Git in your project (for the frontend-only check), Docker (only if your frontend is built into a container), and `npx` (to install a missing skill from skills.sh when you choose to).
 
-   You can run the same thing inside a Claude Code session instead:
+## Install
 
-```
-/plugin marketplace add C:/dev/claude-plugins/artifact-tools
-/plugin install artifact-parity@artifact-tools
-```
+**Ask Claude to do it:** give Claude Code this repository's link and say "Read the README and install this plugin." The steps below are written so Claude can follow them as they are.
 
-3. Restart Claude Code. Type `/` and check that `artifact-parity:build` appears in the list.
+1. Add the marketplace:
+
+   ```
+   claude plugin marketplace add sanularajapaksha-prog/artifact-ui
+   ```
+
+2. Install the plugin:
+
+   ```
+   claude plugin install artifact-parity@artifact-tools
+   ```
+
+3. Check that it's installed - `artifact-parity@artifact-tools` should be in the list:
+
+   ```
+   claude plugin list
+   ```
+
+4. **Restart Claude Code.** The plugin's helper agent only loads when a session starts. After the restart, type `/` and check that `artifact-parity:build` appears.
+
+Inside a Claude Code session, steps 1 and 2 are also available as `/plugin marketplace add sanularajapaksha-prog/artifact-ui` and `/plugin install artifact-parity@artifact-tools`. There is nothing else to set up: the first build installs its browser tooling by itself.
 
 ## Use
 
-**Build from an artifact:**
-
 ```
-/artifact-parity:build <artifact-link> <what you want, in plain words>
+/artifact-parity:build <artifact link or file> <what to build and where, in plain words>
 ```
 
 Examples:
 
 ```
 /artifact-parity:build https://claude.ai/code/artifact/xxxx
-/artifact-parity:build https://claude.ai/code/artifact/xxxx build only the pricing cards, put it on the dashboard page
+/artifact-parity:build https://claude.ai/code/artifact/xxxx only the pricing cards, on the dashboard page
+/artifact-parity:build ./design/checkout.html apply it to the checkout page
 ```
 
-- **No description:** the whole artifact is built.
-- **Name a part** ("only the pricing cards"): only that part is built and checked. If your words match more than one section, you're asked which one.
-- **Name a place** ("apply it to the orders dashboard", "put it on the dashboard page"): the plugin finds that place in your project.
-  - **A component there matches the design:** it is **enhanced in place** - same file, same logic, data and handlers; only markup and styles change to the artifact's. No copy, no new folder.
-  - **Nothing there matches:** the design is **built new at that place**.
-  - **Either way, you confirm the place before anything is built.**
-- **Frontend only:** it changes files only inside the frontend app folder (plus its own `design-ref/` output) - never backend, Docker/compose, env or other apps. A git snapshot before building proves it at the end; anything changed outside is listed and can be reverted (your own earlier uncommitted work is never touched). A design that needs a new API field is reported as "needs backend" instead of being built.
-- **Always a one-to-one copy** of the artifact, whatever you state about the place, container or URL.
-- **Works in any project:** it detects the UI app, framework, dev server, and the Docker compose service and container that serve the app. Nothing is hardcoded. Anything you state yourself wins over detection and is remembered - for example "the frontend runs in the acme-web container", "it's served at http://localhost:8080", "rebuild with ./build.sh"; the rest is detected around it. Saved in `design-ref/.parity-project.json`.
-- **Pages behind a login:** you choose how, each time it is needed: log in yourself in a browser window the plugin opens, give an env file path that holds the login, let it search the project's env files and pick one, or paste a username and password (used once, never saved). Only key names are ever shown, never values; the session (never the password) is kept in the plugin's data folder, and the env path you used is offered again next time.
-- **Deploy port:** before the Docker rebuild it asks which URL/port to check, offering the one you used last time and the detected one.
-- **Real data:** when an existing screen shows real data instead of the artifact's sample text, those elements are checked for styles only, not for text or size.
-- **Finish with Docker:** after all passes, if a container serves the app, the plugin names it and asks you before it rebuilds and restarts it, then takes the final score from the Docker build.
+With no description the whole artifact is built. Name a part ("only the pricing cards") to build just that part, and a place ("on the dashboard page") to say where it goes.
 
-**Ask once, then it works on its own:** the run first analyzes your project and the artifact (stage 3, no questions), then asks everything it needs in one go (stage 4): where the design goes, which part, how to sign in (only if a login gate is found), missing skills, the Docker container and port for the final check, leftovers, and what to do if something unexpected comes up at the end. After you answer, it builds to the end without stopping and reports the result - including any "Decisions I made" it took on its own. It stops again only for a real blocker (a failed login, a build error it can't fix inside the frontend).
+### How a run goes
 
-**Signing in:** a login window you use yourself (recommended), an env file you name, one found by searching the project's env files, or the plugin's own login file - an empty file only you can open, which you fill in your editor and which is deleted right after the login. Credentials never go through the chat.
+1. **Analyze - no questions.** It finds your app, framework and dev server, and - if your frontend is built into a Docker container - that container. It reads the artifact, including parts that only show after a click (a tab, a mode, an open panel), and finds where the design should go.
+2. **Your answers - the only stop.** It asks everything at once, each question with a recommended option: where the design goes, which part, how to sign in (only if your app has a login), any missing skills, whether to rebuild the container for the final check, and what to do if something unexpected comes up at the end.
+3. **Build to the end.** It builds, measures and fixes in up to three passes, rebuilds the container if you said so, and reports the score - plus any "Decisions I made" on its own, so you can undo them. It stops again only for a real blocker, such as a failed login or a build error it can't fix inside your frontend.
 
-**What the chat shows:** only stage lines, questions that need your answer, and the final result. A helper agent does the file reads, commands and edits out of sight. Claude Code still shows one collapsed line per stage for it; expand it if you're curious.
+### What it promises
 
-**Pick skills for any task:**
+- **One-to-one copy** of the artifact's markup, classes, styles and values - not your project's look-alikes.
+- **Enhance, don't duplicate:** when a component at the place you name already matches the design, it is changed in place - same file, same logic, data and handlers. Otherwise the design is built new at that place.
+- **Frontend only:** it changes files only inside your frontend app, plus its own `design-ref/` folder. A git snapshot taken before building proves it at the end; anything changed outside is reverted or listed, as you chose. A design that needs a new API field is reported as "needs backend" instead of being built.
+- **Honest numbers:** every score comes straight from the measuring script. Parts that only show in an app state the measured page isn't in (for example a halo that shows only while a job is running) are listed as "state not reached", outside the score.
+- **Works in any project:** nothing is hardcoded. Anything you state - for example "the frontend runs in the web container" or "it's served at http://localhost:8080" - wins over detection and is remembered in `design-ref/.parity-project.json`.
+
+### Signing in
+
+Only when a login gate is found: a login page, a password field, or a "Sign in with ..." screen. You choose how:
+
+- a browser window where you log in yourself (recommended)
+- an env file you name
+- an env file found by searching the project (only key names are shown, never values)
+- the plugin's own login file - an empty file only you can open, which you fill in your editor and which is deleted right after the login
+
+Credentials never go through the chat. The saved session (never the password) is kept in the plugin's data folder, not in your project.
+
+### What it measures
+
+Fonts (family, weight, web font loaded), font size, line-height, letter-spacing, text, colors, borders, radius, padding, margin, size, shadows, opacity, transforms, theme variables (light and dark), flex and grid layout, positions inside the part, hover states, keyframe and JS animations, transitions, and `::before`/`::after` pseudo-elements (rings, halos, shimmers). Screen sizes 1440, 768 and 390, plus 1440 dark when the artifact has a dark theme. Colors must match exactly; pixel values within 0.5px.
+
+### Watch progress
+
+Every run prints one line per stage, for example:
+
+```
+━━ [1/9] Preflight ✔ 4s — scripts ok
+━━ [4/9] Your answers ✔ — 5 answers saved
+━━ [6/9] Pass 1 build ✔ 6m 02s — 97% (563/580) · 9 rows to fix
+━━ [9/9] Finish ✔ — 100% CLEAN (580/580) · total 14m 20s
+```
+
+The same lines, with times, are kept in `design-ref/progress.md` in your project. For a live status bar at the bottom of Claude Code, run `/artifact-parity:statusbar on` (it asks first, backs up your settings, and won't replace a status bar you already have unless you say yes; `/artifact-parity:statusbar off` puts everything back).
+
+### Pick skills for any task
 
 ```
 /artifact-parity:scout <what you want to do>
 ```
 
-Scout also starts on its own at the beginning of bigger tasks. Your answers ("use X" or "skip") are remembered, so it asks about each kind of part only once.
+Scout picks your installed skills for each part of a task. When a part has no matching skill, it can search skills.sh and install the one you pick - never anything you didn't pick.
 
-## Watch progress
-
-Every build run prints one line per stage, for example:
-
-```
-━━ [1/9] Preflight ✔ 4s — scripts ok
-━━ [2/9] Get source ✔ 12s — artifact.html (84 KB, real source)
-━━ [6/9] Pass 1 build … section 3/7 "pricing cards"
-━━ [6/9] Pass 1 build ✔ 6m 02s — 71% (412/580) · 9 rows to fix
-━━ [9/9] Finish ✔ — 100% CLEAN · total 14m 20s
-```
-
-There are three ways to follow a run:
-
-- **In the chat:** the stage lines above, printed at every stage.
-- **In a log file:** `design-ref/progress.md` in your project keeps the same lines with times, one section per run. You can open it anytime, even after `/clear`.
-- **In a live bar (optional):** a status bar at the bottom of Claude Code shows the current stage.
-
-```
-/artifact-parity:statusbar on
-```
-
-It shows something like `▸ parity · pricing-page · 6/9 Pass 1 build · section 3/7 · 6m12s`.
-
-The status bar details:
-
-- It asks before changing your settings.
-- It backs up your settings file first.
-- It won't replace a status bar you already have unless you say yes.
-- `/artifact-parity:statusbar off` puts everything back.
-
-If your terminal shows broken symbols, set the environment variable `PARITY_ASCII=1` for plain-text output.
-
-## Update (each time you get a new version of this folder)
-
-Claude Code installs a copy of the plugin into its cache, keyed by the version number. Each new version of this folder comes with a higher `version` in `plugin.json`.
-
-1. Replace the folder contents with the new version.
-2. Run these commands:
+## Update
 
 ```
 claude plugin marketplace update artifact-tools
 claude plugin update artifact-parity@artifact-tools
 ```
 
-3. Restart Claude Code. This is required: the helper agent only loads when a session starts.
+Then restart Claude Code.
 
-## Status (v0.9.0)
+## Uninstall
 
-| Part | State |
-|---|---|
-| Plugin + marketplace manifests | done (step 1) |
-| `skills/scout` + `scripts/list-skills.mjs` | done (step 2), works now |
-| Progress lines, log, status bar | done (step 3), works now |
-| Quiet mode, plain-words description, part selection | done (step 4) |
-| `setup.mjs` (installs Playwright + a browser, falls back to Edge/Chrome), `fetch-public.mjs`, `check-source.mjs` | done (step 5) |
-| `scripts/capture.mjs` (+ `.jsx` harness, section ids for part selection) | done (step 6) |
-| `scripts/compare.mjs` (+ `--scope`, pass-3 crops) | done (step 7) |
-| Enhance-in-place or build-new at the confirmed place, project detection (`detect-project.mjs`), login sessions, `--live-data`, Docker rebuild + final check with approval | done (v0.7.0) |
-| Full run on a real screen | step 8 |
+```
+claude plugin uninstall artifact-parity@artifact-tools
+claude plugin marketplace remove artifact-tools
+```
 
-**Motion:** keyframe, JS and `::before`/`::after` pseudo-element animations (rings, halos, shimmers) are measured and compared. Motion is always a skill part: if no installed skill covers how this project writes it, you get the same "Find and install one" choice, before building and again if motion rows remain.
+Each project keeps its build notes in `design-ref/`; delete that folder if you don't need it.
 
-**Measured:** fonts (family, weight, web font loaded), font size, line-height, letter-spacing, text, colors, borders, radius, padding, margin, size, shadows, opacity, transforms, theme variables (light and dark), flex/grid layout, x/y inside each section, hover states, keyframe and JS animations, transitions. Screen sizes 1440, 768, 390, plus 1440 dark when the artifact has a dark theme. Colors must match exactly; px values within 0.5px.
+## Troubleshooting
 
-**States:** parts that appear only after a click (a mode like Timeline, a tab, an open panel) are captured by clicking them first (`--click`, in order). `ref-map.md` lists the page's state controls, and the built page is measured in the same state.
+- **`/artifact-parity:build` isn't listed:** restart Claude Code; plugin agents load when a session starts.
+- **Broken symbols in the progress lines:** set the environment variable `PARITY_ASCII=1` for plain-text output.
+- **The browser download is blocked** (for example by a proxy): the plugin uses Microsoft Edge or Google Chrome instead. If neither is installed, install one, or allow the Playwright download.
+- **The artifact link can't be read:** open the artifact in claude.ai, download it, and pass the file path instead of the link.
 
-**Honest numbers:** every stage line's score and row count come from compare's own `result.json`; a part is scoped by its exact subtree (`"elements": ["r-023..r-055"]`, listed under Parts in `ref-map.md`), not the whole section around it. If the build has an artifact rule in its CSS but the measured page isn't in the state that turns it on (for example a halo that shows only while a job is running), those rows are listed as "state not reached", kept out of the score, and you're asked for a page in that state.
+## Limitations
 
-**Not measured yet:** focus/active states.
+- Focus and active states aren't measured yet.
+- Parts that appear only after typing, dragging or a long hover can't be captured; parts behind clicks can.
 
-**First-run download:** on the first real run, setup downloads Playwright and a browser (about 150 MB) into the plugin's data folder, not into your project. If a proxy blocks the browser download, it uses the Microsoft Edge or Google Chrome already on your PC.
+## License
+
+MIT - see [LICENSE](LICENSE).
