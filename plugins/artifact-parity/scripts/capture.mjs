@@ -10,6 +10,8 @@
 //   capture.mjs --data <dir> --mode login --target <URL>   opens a browser window; the user logs in
 //   capture.mjs --data <dir> --mode login --target <URL> --env <file> [--user-key K --pass-key K]
 //                                                        logs in by itself with the credentials in a user-given env file
+//   PARITY_LOGIN_USER=.. PARITY_LOGIN_PASS=.. capture.mjs --data <dir> --mode login --target <URL> --creds-from-env
+//                                                        logs in once with credentials the user pasted (never saved or printed)
 //   capture.mjs --data <dir> --mode env-search --target <project dir>   lists env files holding login key pairs (names only)
 // ref   writes ref.json, ref-map.md and ref-<size>.png
 // build writes build.json and build-<size>.png, reusing the sizes, hover
@@ -158,26 +160,43 @@ const USER_FIELD = ['input[type=email]', 'input[autocomplete=username]', 'input[
 // One step of a login form: fills what is visible and submits. Handles one-page and
 // two-step forms (username first, then password, as Okta, Microsoft and Google do).
 async function fillLoginStep(page, creds) {
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
   const pass = page.locator('input[type=password]:visible').first();
   const user = page.locator(USER_FIELD).first();
   let last = null;
-  if (await user.count() && !(await user.inputValue().catch(() => 'x'))) { await user.fill(creds.user); last = user; }
-  if (await pass.count()) { await pass.fill(creds.pass); last = pass; }
-  if (last) await last.press('Enter');
+  const did = [];
+  const before = page.url();
+  if (await user.count() && !(await user.inputValue().catch(() => 'x'))) { await user.fill(creds.user); last = user; did.push('user'); }
+  if (await pass.count()) { await pass.fill(creds.pass); last = pass; did.push('password'); }
+  if (last) {
+    await last.press('Enter');
+    // Wait for the form to leave (new URL, or the field gone) so the next step never runs mid-navigation.
+    await Promise.race([
+      page.waitForURL((u) => u.toString() !== before, { timeout: 10000 }),
+      last.waitFor({ state: 'detached', timeout: 10000 }),
+    ]).catch(() => {});
+  }
+  if (process.env.PARITY_DEBUG) console.error(`[login] ${before} filled: ${did.join('+') || 'nothing'} -> ${page.url()}`);
   return !!last;
 }
 
 async function login() {
   const file = authFile(target);
   if (!file) fail('login needs an http(s) URL');
-  const creds = typeof flag('env') === 'string' ? readCreds(flag('env')) : null;
+  let creds = typeof flag('env') === 'string' ? readCreds(flag('env')) : null;
+  // Pasted by the user: passed only through this process's environment, used once, never saved or printed.
+  if (flag('creds-from-env') === true) {
+    if (!process.env.PARITY_LOGIN_USER || !process.env.PARITY_LOGIN_PASS) fail('PARITY_LOGIN_USER and PARITY_LOGIN_PASS must both be set for --creds-from-env');
+    creds = { user: process.env.PARITY_LOGIN_USER, pass: process.env.PARITY_LOGIN_PASS, label: 'the username and password you gave' };
+  }
+  if (creds && !creds.label) creds.label = `${creds.userKey} / ${creds.passKey} from ${creds.file}`;
   const browser = await launchBrowser(data, creds ? {} : { headless: false });
   try {
     const context = await browser.newContext(creds ? { viewport: { width: 1440, height: HEIGHT } } : { viewport: null });
     const page = await context.newPage();
     await page.goto(target, { waitUntil: 'domcontentloaded', timeout: timeoutMs }).catch(() => {});
     console.log(creds
-      ? `Logging in with ${creds.userKey} / ${creds.passKey} from ${creds.file} (values are not shown)...`
+      ? `Logging in with ${creds.label} (values are not shown)...`
       : 'Log in in the browser window that just opened. It closes by itself once you are in.');
     const origin = new URL(target).origin;
     const started = Date.now();
@@ -192,7 +211,7 @@ async function login() {
       const atLogin = await looksLikeLogin(page);
       sawLogin ||= atLogin;
       // Fill only on a login page or an identity provider's site - never into the app's own inputs.
-      if (creds && steps < 6 && (atLogin || !onSite)) {
+      if (creds && steps < 8 && (atLogin || !onSite)) {
         if (await fillLoginStep(page, creds)) { steps++; await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {}); continue; }
       }
       okCount = onSite && !atLogin ? okCount + 1 : 0;
@@ -207,7 +226,7 @@ async function login() {
         return;
       }
     }
-    if (creds) fail(`the login did not finish with ${creds.userKey} / ${creds.passKey} from ${creds.file} (still at ${page.url()}) - check those values, or use the login window`);
+    if (creds) fail(`the login did not finish with ${creds.label} (still at ${page.url()}) - check those values, or use the login window`);
     fail('no login within 10 minutes');
   } finally { await browser.close().catch(() => {}); }
 }

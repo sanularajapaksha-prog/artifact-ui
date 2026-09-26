@@ -65,11 +65,19 @@ Check whether `preview_url` needs a login:
 node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode probe --target "<preview_url>"
 ```
 
-- It prints `open`, or `login needed`. On `login needed`, run `progress.mjs wait 3 --note "log in once"` and return STATUS `needs-user`: "The page needs a login. How do you want to sign in?" with exactly these three options (the env options are optional conveniences; never pick one for the user):
+- It prints `open`, or `login needed`. On `login needed`, run `progress.mjs wait 3 --note "log in once"` and return STATUS `needs-user`: "The page needs a login. How do you want to sign in?" with exactly these four options (the env and paste options are optional conveniences; never pick one for the user):
   - `Open the login window` - "A browser window opens; you log in there yourself."
   - `Use an env file I give` - "Type the path of an env file that holds the login." If `design-ref/.parity-project.json` has `user.loginEnv`, add "(last time: <that path>)" to this description.
   - `Search the project's env files` - "I look for env files with a login user/password and you pick one."
+  - `Paste username and password` - "Type them in your answer (username, then password). Used once for this login; never saved or shown."
 - When resumed:
+  - **Pasted username and password:** run the login once with them passed only as environment variables of that single command, and never repeat them anywhere else (not in NOTES, progress notes, files, or your reply):
+
+```
+PARITY_LOGIN_USER='<username>' PARITY_LOGIN_PASS='<password>' node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode login --target "<preview_url>" --creds-from-env
+```
+
+    If the answer doesn't clearly hold both a username and a password, ask again for the missing one. If the login fails, show its one-line reason and ask the four options again.
   - **Login window:**
 
 ```

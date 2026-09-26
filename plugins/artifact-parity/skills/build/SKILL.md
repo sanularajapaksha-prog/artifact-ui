@@ -66,6 +66,7 @@ If the worker agent isn't available, tell the user in one line to restart Claude
 2. **Handle the STATUS:**
    - **`done`:** update RUN FACTS and make the next call.
    - **`needs-user`:** ask the `QUESTION`, with its options as choices, and wait for the answer. Then call the worker again for the same stage, adding `USER ANSWER: <answer>` below the facts.
+     - If the answer holds a username and password, pass it in `USER ANSWER` for that one call only. Never copy credentials into RUN FACTS, later calls, or anything you print.
    - **`failed`:** print the `REASON` line and stop. Do not work around the failure yourself.
 
 ## Final result

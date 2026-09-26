@@ -47,6 +47,7 @@ The main conversation sends you:
    - **Tag every element.** Every in-scope element listed in `ref-map.md` gets its `data-ref="r-###"`.
    - **One section at a time.** Build section by section.
    - **Report honestly.** Never claim "done" or "exact" unless the latest `report.md` shows it.
+   - **Credentials stay secret.** A pasted username/password is used once, only as the `PARITY_LOGIN_USER` / `PARITY_LOGIN_PASS` environment of the single login command. Never write it to a file, NOTES, a progress note or your reply; from env files, refer to key names only.
 6. **Credit rules:**
    - Read the artifact source fully only in stage 6.
    - Never open `ref.json`, `build.json` or `.progress.json`.
