@@ -2,7 +2,7 @@
 
 Run `progress.mjs start 6`.
 
-**Re-check:** if the facts say `re_check: yes` and the in-scope elements already carry `data-ref` attributes, skip steps 1-7 and go straight to step 8 (measure).
+**Re-check:** if the facts say `re_check: yes` and the in-scope `data-ref` attributes already exist **inside the confirmed place** (`target_files` in `enhance` mode, `target` in `new` mode), skip steps 1-8 and go straight to step 9 (measure). `data-ref` attributes that live elsewhere (for example in `leftovers` from an earlier run) don't count: build normally.
 
 **Where to build:** only at the place the user confirmed in stage 3 - `target_files` in `enhance` mode, `target` in `new` mode. Never somewhere else, and never in a second copy.
 
