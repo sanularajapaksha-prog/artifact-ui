@@ -10,8 +10,10 @@
 //   capture.mjs --data <dir> --mode login --target <URL>   opens a browser window; the user logs in
 //   capture.mjs --data <dir> --mode login --target <URL> --env <file> [--user-key K --pass-key K]
 //                                                        logs in by itself with the credentials in a user-given env file
-//   PARITY_LOGIN_USER=.. PARITY_LOGIN_PASS=.. capture.mjs --data <dir> --mode login --target <URL> --creds-from-env
-//                                                        logs in once with credentials the user pasted (never saved or printed)
+//   capture.mjs --data <dir> --mode login-file --target <URL>   creates the plugin's own login file (owner-only, empty)
+//                                                        for the user to fill; prints its path
+//   capture.mjs --data <dir> --mode login --target <URL> --login-file [--keep-login-file]
+//                                                        logs in with that file, then deletes it (unless kept)
 //   capture.mjs --data <dir> --mode env-search --target <project dir>   lists env files holding login key pairs (names only)
 // ref   writes ref.json, ref-map.md and ref-<size>.png
 // build writes build.json and build-<size>.png, reusing the sizes, hover
@@ -24,6 +26,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { launchBrowser } from './lib/deps.mjs';
 
 const argv = process.argv.slice(2);
@@ -38,8 +41,8 @@ const mode = flag('mode');
 const target = flag('target');
 const out = flag('out');
 const pageMode = mode === 'ref' || mode === 'build';
-if (typeof data !== 'string' || !['ref', 'build', 'probe', 'login', 'env-search'].includes(mode) || typeof target !== 'string' || (pageMode && typeof out !== 'string')) {
-  console.error('capture: --data, --mode ref|build|probe|login|env-search and --target are required (--out for ref and build)');
+if (typeof data !== 'string' || !['ref', 'build', 'probe', 'login', 'login-file', 'env-search'].includes(mode) || typeof target !== 'string' || (pageMode && typeof out !== 'string')) {
+  console.error('capture: --data, --mode ref|build|probe|login|login-file|env-search and --target are required (--out for ref and build)');
   process.exit(2);
 }
 const timeoutMs = (Number(flag('timeout')) || 60) * 1000;
@@ -77,9 +80,22 @@ async function newContext(browser, url, options) {
   return context;
 }
 const LOGIN_URL = /\/(login|log-in|signin|sign-in|sign_in|auth|oauth2?|sso|authorize)(\/|\?|$)|login\.microsoftonline\.com|accounts\.google\.com|\.auth0\.com|\.okta\.com|clerk\./i;
+// A sign-in gate: a login URL, a visible password field, or - for apps that show "Sign in with
+// Okta / Google / SSO" on the same URL without redirecting - a sign-in button on a page with
+// almost nothing else on it.
+const SIGN_IN_TEXT = /\b(sign|log)\s?-?in\b|\bcontinue with\b|\bsingle sign-on\b|\bsso\b/i;
 async function looksLikeLogin(page) {
   if (LOGIN_URL.test(page.url())) return true;
-  return page.evaluate(() => [...document.querySelectorAll('input[type=password]')].some((i) => i.offsetParent !== null)).catch(() => false);
+  return page.evaluate((src) => {
+    const re = new RegExp(src, 'i');
+    const shown = (el) => el.offsetParent !== null || getComputedStyle(el).position === 'fixed';
+    if ([...document.querySelectorAll('input[type=password]')].some(shown)) return true;
+    const clickable = [...document.querySelectorAll('button, a[href], [role=button], input[type=submit]')].filter(shown);
+    // A gate has a sign-in control and little else: few things to click and hardly any text
+    // (a public page with a "Sign in" link in its header has paragraphs of content).
+    const little = document.body.innerText.replace(/\s+/g, ' ').trim().length < 400;
+    return little && clickable.length <= 6 && clickable.some((el) => re.test(el.innerText || el.value || el.getAttribute('aria-label') || ''));
+  }, SIGN_IN_TEXT.source).catch(() => false);
 }
 
 async function probe() {
@@ -170,6 +186,16 @@ async function fillLoginStep(page, creds) {
   const before = page.url();
   if (await user.count() && !(await user.inputValue().catch(() => 'x'))) { await user.fill(creds.user); last = user; did.push('user'); }
   if (await pass.count()) { await pass.fill(creds.pass); last = pass; did.push('password'); }
+  if (!last) {
+    // No fields: a "Sign in with <provider>" gate. Click it to reach the provider's form.
+    const gate = page.locator('button:visible, a[href]:visible, [role=button]:visible, input[type=submit]:visible').filter({ hasText: SIGN_IN_TEXT }).first();
+    if (await gate.count()) {
+      await gate.click({ timeout: 5000 }).catch(() => {});
+      await page.waitForURL((u) => u.toString() !== before, { timeout: 10000 }).catch(() => {});
+      if (process.env.PARITY_DEBUG) console.error(`[login] ${before} clicked the sign-in button -> ${page.url()}`);
+      return true;
+    }
+  }
   if (last) {
     await last.press('Enter');
     // Wait for the form to leave (new URL, or the field gone) so the next step never runs mid-navigation.
@@ -182,21 +208,55 @@ async function fillLoginStep(page, creds) {
   return !!last;
 }
 
+// The plugin's own login file: outside every project, readable only by the current user,
+// filled by the user in an editor (never through the chat), deleted after the login.
+const loginFilePath = () => path.join(path.resolve(data), 'login', 'login.env');
+function ownerOnly(file) {
+  if (process.platform === 'win32') {
+    const user = process.env.USERDOMAIN ? `${process.env.USERDOMAIN}\\${process.env.USERNAME}` : process.env.USERNAME;
+    const r = spawnSync('icacls', [file, '/inheritance:r', '/grant:r', `${user}:F`], { encoding: 'utf8', windowsHide: true });
+    if (r.status !== 0) console.log(`⚠ could not limit ${path.basename(file)} to your user (${(r.stdout || r.stderr || '').trim().split(/\r?\n/)[0]})`);
+  } else {
+    fs.chmodSync(file, 0o600);
+  }
+}
+
+function makeLoginFile() {
+  const lf = loginFilePath();
+  fs.mkdirSync(path.dirname(lf), { recursive: true });
+  if (!fs.existsSync(lf)) {
+    fs.writeFileSync(lf, '# Fill both lines, save, then answer the plugin. Deleted right after the login.\n# Never commit or share this file.\nPARITY_LOGIN_USER=\nPARITY_LOGIN_PASS=\n');
+  }
+  ownerOnly(lf);
+  const vars = parseEnv(fs.readFileSync(lf, 'utf8'));
+  const filled = vars.PARITY_LOGIN_USER && vars.PARITY_LOGIN_PASS;
+  console.log(`✔ login file: ${lf} (${filled ? 'filled - values are not shown' : 'empty - fill PARITY_LOGIN_USER and PARITY_LOGIN_PASS'})`);
+}
+
 async function login() {
   const file = authFile(target);
   if (!file) fail('login needs an http(s) URL');
-  let creds = typeof flag('env') === 'string' ? readCreds(flag('env')) : null;
-  // Pasted by the user: passed only through this process's environment, used once, never saved or printed.
-  if (flag('creds-from-env') === true) {
-    if (!process.env.PARITY_LOGIN_USER || !process.env.PARITY_LOGIN_PASS) fail('PARITY_LOGIN_USER and PARITY_LOGIN_PASS must both be set for --creds-from-env');
-    creds = { user: process.env.PARITY_LOGIN_USER, pass: process.env.PARITY_LOGIN_PASS, label: 'the username and password you gave' };
+  const useLoginFile = flag('login-file') === true;
+  let creds = null;
+  if (useLoginFile) {
+    const lf = loginFilePath();
+    if (!fs.existsSync(lf)) fail(`the login file doesn't exist yet - run capture --mode login-file first (${lf})`);
+    const vars = parseEnv(fs.readFileSync(lf, 'utf8'));
+    if (!vars.PARITY_LOGIN_USER || !vars.PARITY_LOGIN_PASS) fail(`the login file is still empty - fill PARITY_LOGIN_USER and PARITY_LOGIN_PASS in ${lf} and save it`);
+    creds = { user: vars.PARITY_LOGIN_USER, pass: vars.PARITY_LOGIN_PASS, label: 'the plugin login file' };
+  } else if (typeof flag('env') === 'string') {
+    creds = readCreds(flag('env'));
+    creds.label = `${creds.userKey} / ${creds.passKey} from ${creds.file}`;
   }
-  if (creds && !creds.label) creds.label = `${creds.userKey} / ${creds.passKey} from ${creds.file}`;
   const browser = await launchBrowser(data, creds ? {} : { headless: false });
   try {
     const context = await browser.newContext(creds ? { viewport: { width: 1440, height: HEIGHT } } : { viewport: null });
     const page = await context.newPage();
-    await page.goto(target, { waitUntil: 'domcontentloaded', timeout: timeoutMs }).catch(() => {});
+    try {
+      await page.goto(target, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
+    } catch (e) {
+      fail(`the page did not load (${e.message.split(/\r?\n/)[0]})`);
+    }
     console.log(creds
       ? `Logging in with ${creds.label} (values are not shown)...`
       : 'Log in in the browser window that just opened. It closes by itself once you are in.');
@@ -208,6 +268,7 @@ async function login() {
     let steps = 0;
     while (Date.now() < deadline) {
       if (page.isClosed()) fail('the login window was closed before the login finished');
+      if (page.url().startsWith('chrome-error://')) fail('the page stopped loading (the server may be down) - start it and try again');
       await page.waitForTimeout(1000);
       const onSite = (() => { try { return new URL(page.url()).origin === origin; } catch { return false; } })();
       const atLogin = await looksLikeLogin(page);
@@ -224,7 +285,12 @@ async function login() {
         const session = { [origin]: await page.evaluate(() => Object.fromEntries(Object.entries(sessionStorage))) };
         fs.mkdirSync(path.dirname(file), { recursive: true });
         fs.writeFileSync(file, JSON.stringify({ savedAt: new Date().toISOString(), state, session }));
+        ownerOnly(file);
         console.log(`✔ login saved for ${new URL(target).host} - later captures of this site use it`);
+        if (useLoginFile && flag('keep-login-file') !== true) {
+          fs.rmSync(loginFilePath(), { force: true });
+          console.log('✔ login file deleted');
+        }
         return;
       }
     }
@@ -781,7 +847,7 @@ async function main() {
   }
 }
 
-(async () => ({ probe, login, 'env-search': envSearch }[mode] || main)())().catch((e) => {
+(async () => ({ probe, login, 'login-file': makeLoginFile, 'env-search': envSearch }[mode] || main)())().catch((e) => {
   console.log(`✖ capture failed: ${e instanceof CaptureError ? e.message : e.message.split('\n')[0]}`);
   process.exitCode = 1;
 });

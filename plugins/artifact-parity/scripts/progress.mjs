@@ -24,7 +24,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const STAGES = [
-  'Preflight', 'Get source', 'Understand project', 'Pick skills', 'Capture reference',
+  'Preflight', 'Get source', 'Analyze', 'Your answers', 'Set up',
   'Pass 1 build', 'Pass 2 fix', 'Pass 3 fix', 'Finish',
 ];
 const TOTAL = STAGES.length;
