@@ -1,6 +1,6 @@
 ---
 name: scout
-description: Pick which installed skills to use for a task, then use them. Use at the start of any multi-step task (building or porting UI, artifact builds, new features, refactors, migrations, tests, documents, deployments) and whenever the artifact-parity build skill starts. It uses only skills that are already installed. When a part of the task has no matching skill, it stops and tells the user exactly what skill is needed.
+description: Pick which installed skills to use for a task, then use them. Use at the start of any multi-step task (building or porting UI, artifact builds, new features, refactors, migrations, tests, documents, deployments) and whenever the artifact-parity build skill starts. It uses installed skills first. When a part of the task has no matching skill, it tells the user exactly what skill is needed and offers to find one on skills.sh and install the one the user picks.
 argument-hint: [task description]
 ---
 
@@ -11,7 +11,7 @@ Before real work starts, make sure:
 - every part of the task that has a relevant installed skill actually uses it, and
 - the user knows which parts have no skill.
 
-Use only skills that are already installed. Do not search online for skills or install them on your own initiative. Only the user decides what gets installed.
+Use installed skills first. Search online (Step 5b) only when the user chooses "find", and install only the exact skill the user picks. Never install anything on your own initiative.
 
 Skip scouting for small tasks, such as a single quick edit, a question, or a one-file fix. Just do those.
 
@@ -67,13 +67,35 @@ No installed skill covers these parts of the task:
    Needed: <what the skill must cover, concretely: library and version, and the specific APIs or patterns this task uses>
    Search words: <3-5 keywords>
 
-Install a skill for any of these and reply "done", or reply "skip" to continue without it.
+Reply "find" and I'll search skills.sh and show you the best matches to pick from,
+"done" if you installed one yourself, or "skip" to continue without it.
 ```
 
 Then wait for the reply:
 
+- **"find"** (for all parts, or for the ones named): go to Step 5b.
 - **"done":** run Step 3 again, then Step 4 again.
 - **"skip"** (for all parts, or for the ones named): continue without a skill for those parts, and save `"skip"` for them.
+
+## Step 5b - Find and install (only after the user chose "find")
+
+1. **Search** once per missing part, with that part's search words:
+
+```
+npx -y skills find <search words>
+```
+
+   It prints lines like `owner/repo@skill 15.1K installs` followed by a skills.sh link.
+2. **Pick at most 3 candidates per part.** A candidate must clearly cover the part's technology and version (a Tailwind v4 part needs a v4 skill, not a v3 or Expo one). Prefer 1K+ installs and well-known sources. For artifact builds, the Step 4 rule applies: no design-taste skills.
+3. **Ask the user to pick.** One question per part. Each option is `owner/repo@skill · <installs> installs`, with the skills.sh link as its description, plus a last option `Skip this part`. If no candidate qualifies, say so and offer only `Skip this part`.
+4. **Install only the picked skill:**
+
+```
+npx -y skills add <owner/repo@skill> -g -y -a claude-code
+```
+
+5. **Check it landed:** run Step 3 again. The skill must now appear in the list (usually at `~/.claude/skills/<skill>/SKILL.md`). A newly installed skill works in the current session; load it by opening that `SKILL.md` (Step 6). If the install failed or the skill is not listed, show the user the error line and offer `Try another` / `Skip this part`.
+6. **Continue** with Step 4 for the remaining parts.
 
 ## Step 6 - Use the chosen skills
 

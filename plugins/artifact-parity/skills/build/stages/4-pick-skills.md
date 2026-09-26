@@ -14,8 +14,10 @@ Run `progress.mjs start 4`.
 1. **Implementation skills only.** Select only implementation skills. Never select design-taste skills; they conflict with exact copying.
 2. **Never ask the user directly.** If scout reaches its "ask once about missing parts" step:
    1. Run `progress.mjs wait 4 --note "missing skills: <parts>"`.
-   2. Return STATUS `needs-user`, with scout's missing-skill message as the QUESTION. Options: `Installed - rescan` / `Skip these parts`.
+   2. Return STATUS `needs-user`, with scout's missing-skill message as the QUESTION. Options: `Find and install one` / `Installed - rescan` / `Skip these parts`.
    3. When resumed:
+      - "find": run `progress.mjs start 4 --note "searching skills.sh"`, then do scout's Step 5b searches. Instead of asking, run `progress.mjs wait 4 --note "pick a skill for <part>"` and return STATUS `needs-user`: the QUESTION is "Which skill should I install for <part>?", options are scout's candidates (`owner/repo@skill · <installs> installs`) plus `Skip this part`. One part per question.
+      - a picked `owner/repo@skill`: run `progress.mjs start 4 --note "installing <skill>"`, install it and check it landed (scout Step 5b, steps 4-5), then match again. If it failed, return `needs-user` with the error line and options `Try another` / `Skip this part`.
       - "rescan" (or "done"): run `progress.mjs start 4`, then list and match again.
       - "skip": save `"skip"` for those parts, as scout describes, then continue.
 
