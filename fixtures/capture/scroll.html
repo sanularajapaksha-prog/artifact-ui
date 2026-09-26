@@ -1,0 +1,33 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scroll probe</title>
+<script>
+const P=new URLSearchParams(location.search);
+if(P.get('v')==='b')document.documentElement.classList.add('vb');
+if(P.get('smooth')==='1')document.documentElement.classList.add('smooth');
+</script>
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.20/dist/lenis.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lenis@1.1.20/dist/lenis.css">
+<style>
+html.smooth{scroll-behavior:smooth}
+body{margin:0;font-family:system-ui,sans-serif}
+header#hdr{position:fixed;top:0;left:0;right:0;height:48px;background:#111;color:#fff;display:flex;align-items:center;padding:0 16px;z-index:10}
+#sy{margin:0 0 0 auto;font:12px monospace}
+section{padding:64px 24px;min-height:200px;border-bottom:1px solid #ddd}
+.box{width:60px;height:60px;background:#9333ea;border-radius:8px}
+.spacer{height:1800px}
+.io{opacity:0;transform:translateY(40px);transition:opacity .6s,transform .6s}
+.io.in{opacity:1;transform:none}
+#sticky{position:sticky;top:60px;background:#fde68a;padding:8px}
+</style></head><body>
+<header id="hdr"><strong>Header</strong><p id="sy">scrollY=0</p></header>
+<section id="s-top"><h1>Scroll probe</h1><div id="sticky">sticky note</div></section>
+<div class="spacer"></div>
+<section id="s-io"><h2>Reveal</h2><div id="io1" class="box io"></div></section>
+<div class="spacer"></div>
+<script>
+if(P.get('lenis')==='1'){const lenis=new Lenis();(function raf(t){lenis.raf(t);requestAnimationFrame(raf);})(0);}
+addEventListener('scroll',()=>{document.getElementById('sy').textContent='scrollY='+Math.round(scrollY);},{passive:true});
+const once=new IntersectionObserver((es)=>es.forEach((e)=>{if(e.isIntersecting){e.target.classList.add('in');once.unobserve(e.target);}}),{threshold:.2});
+once.observe(document.getElementById('io1'));
+</script>
+</body></html>

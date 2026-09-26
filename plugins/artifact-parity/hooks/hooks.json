@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/skills-offer.mjs\" --hook; exit 0",
+            "commandWindows": "if (Get-Command node -ErrorAction SilentlyContinue) { node \"$env:CLAUDE_PLUGIN_ROOT\\scripts\\skills-offer.mjs\" --hook }",
+            "timeout": 15,
+            "statusMessage": "Checking recommended skills..."
+          }
+        ]
+      }
+    ]
+  }
+}

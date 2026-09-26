@@ -7,14 +7,33 @@ The reasoning behind the bigger changes is in [docs/DECISIONS.md](docs/DECISIONS
 
 ---
 
-## Unreleased
+## v0.10.0 — Design an artifact from plain words, then build it
 
-- Added `CLAUDE.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/DEVELOPMENT.md` and this
-  changelog.
-
-> **Note for the next release.** `v0.9.0` was tagged and cached, then further edits landed under the
-> same version number, so the installed `0.9.0` is older than the source in five files. The next bump
-> ships them. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) section 2.
+- **New `/artifact-parity:design`.** Describe the UI you want and where it goes (redesign a part you
+  have, a new part in your frontend, or a standalone page). It reads your project's tokens and fonts,
+  asks once, prints a design direction, writes the page, checks it in a real browser at three widths,
+  critiques and fixes it, checks that it renders the same every time, publishes it and hands it to the
+  build with the place already filled in. It never touches your app's code. — D18
+- **Skills are confirmed, never used silently.** Both the design and the build ask you, in their one
+  question round, which of the matched skills to use; when one of the plugin's recommended skills and
+  one of yours cover the same part, you choose (ours first, the others by skills.sh install count). — D19
+- **Recommended skills offer (`/artifact-parity:skills`).** The first session after installing shows the
+  design skills the plugin recommends, plus three optional plugins, and installs only what you pick.
+  Same-name skills from another author are never replaced without asking and are backed up;
+  `/artifact-parity:skills remove` removes only what the plugin installed. — D19
+- **Light only.** When the artifact has a dark theme and your app has none, the build asks whether to
+  skip dark mode; skipping leaves it out of the build and the score. — D10 note
+- **A changed artifact is rebuilt.** Re-running the build on a design republished to the same link (or
+  a file edited in place) now uses the new version instead of the saved copy. — D15 note
+- **Honest about what isn't measured.** The final result names techniques the check can't verify
+  (GSAP, scroll-linked motion, canvas, video) and fonts the reference page failed to load.
+- **Steadier captures.** Scrolling during capture no longer races `scroll-behavior: smooth` or skipped
+  frames, which made scroll reveals flaky, and the hover pass waits for the page to render before it
+  points at an element, which sometimes skipped a hover state.
+- Added `CLAUDE.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/DEVELOPMENT.md`, this
+  changelog, and `fixtures/capture/` (probe pages plus a noise check for `capture.mjs`).
+- Ships the edits that had landed after `v0.9.0` was cached (see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+  section 2).
 
 ## v0.9.0 — Ask every question once after analysis, then run to the end
 

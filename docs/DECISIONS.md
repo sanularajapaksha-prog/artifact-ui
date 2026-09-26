@@ -222,6 +222,10 @@ quietly does not apply, which is worse than an error.
 **Never pick a page-wide wrapper** as the part. The stage file says to choose the smallest named part
 holding everything the brief names, and to offer the wrapper as the *second* option.
 
+**Note (v0.10.0): "light only" is a capture flag, not a scope key.** Skipping dark mode for an app that
+has none could have been a seventh scope key, but `capture.mjs --light-only` removes the dark variant at
+the source: it is never measured, so compare needs no change and the six keys stay as they are.
+
 ---
 
 ## D11 — Capture states behind clicks
@@ -305,6 +309,11 @@ straight to measuring and scores a component the user is no longer using.
 place** — `target_files` in `enhance` mode, `target` in `new` mode. Attributes in `leftovers` from an
 earlier run explicitly do not count.
 
+**Note (v0.10.0): a re-check needs the same source, byte for byte.** Stage 2 used to reuse the saved
+`artifact.*` whenever the link or path was the same. A design republished to the same link (or a file
+edited in place) then kept the old copy, and this rule could skip the build entirely. Stage 2 now fetches
+anyway and compares; only an identical source is a re-check.
+
 ---
 
 ## D16 — `progress.mjs` owns the output format
@@ -317,9 +326,12 @@ and appends `progress.md`. Nothing else prints run status.
 **Consequences worth keeping:**
 - `PARITY_ASCII=1` gives a plain-text fallback for terminals without Unicode. Any new symbol needs an
   ASCII twin in the same `G` object.
-- The preflight verifies **all ten scripts exist** before anything is built, and distinguishes "this
+- The preflight verifies **all twelve scripts exist** before anything is built, and distinguishes "this
   plugin version doesn't include them yet" from "plugin files damaged" — because the user's fix is
   different in each case, and "reinstall" is useless advice for the first one.
+- **Run kinds (v0.10.0).** `preflight --run design` starts a 6-stage design run; a build (the default,
+  also for state files written before run kinds) keeps its 9 stages and prints exactly the lines it
+  printed before. The stage list lives in one `RUNS` table, so a new run kind never duplicates the printer.
 
 ---
 
@@ -331,12 +343,78 @@ and appends `progress.md`. Nothing else prints run status.
 stage 3 calls into its Steps 1-4 rather than duplicating the logic.
 
 **Rules that matter:**
-- **Implementation skills only, never design-taste skills.** The artifact is the design authority; a
-  taste skill would argue with it.
+- **In builds, implementation skills only, never design-taste skills.** The artifact is the design
+  authority; a taste skill would argue with it. (Designs are the opposite case: see D18.)
 - **Motion is always its own part** whenever the artifact moves at all, named by what it uses *and* how
   this project must write it — for example `animation: CSS @keyframes loops on ::after in React + Tailwind v4`.
 - **Nothing is installed that the user did not pick.** Search may propose up to 3 candidates; the user
   chooses.
+
+---
+
+## D18 — Design is a separate command that ends in a build
+
+**Version:** v0.10.0 · **Files:** `skills/design/SKILL.md`, `scripts/progress.mjs`, `scripts/check-source.mjs`, `scripts/capture.mjs`
+
+**Problem.** The build needs an artifact, and many users arrive with only an idea ("a parallax hero with a
+loading screen"). Asking Claude for an artifact by hand gives a page that ignores the project's tokens,
+uses motion the build can't verify, and has to be carried to the build by hand.
+
+**Decision.** `/artifact-parity:design` turns a plain-words requirement into a published artifact and hands
+it to the build.
+
+- **It runs in the main conversation, not through a worker.** Designing is a conversation (a direction,
+  feedback rounds, republishing to the same link), and the Artifact tool refuses to publish to an artifact
+  the current conversation has not read or published. The cost is context: the page is written here.
+  If that proves too heavy, the draft and check can move into a worker later.
+- **Taste skills are wanted here** (the reverse of D17). For a redesign or a new part, the project's own
+  tokens and fonts beat the taste skill; only a standalone design is free.
+- **It never writes app code.** Everything goes to `design-ref/_designs/<slug>/`, proven with
+  `scope-guard.mjs`.
+- **The page is authored to be measurable:** CSS and WAAPI motion before GSAP, reveals that don't toggle,
+  no smooth scroll on `html`, a loader held by the `#hold-loader` hash rather than a visible control (a
+  control would be copied into the app; the Artifact frame passes a plain hash but never a query), no
+  generated DOM, named parts. The build still can't hold the loader, so check-source lists it as not measured. These rules come from 38 test captures of
+  what `capture.mjs` can and cannot measure.
+- **It is checked for stability before it is published:** two captures of the final page are compared with
+  each other. Any row is something no build could ever match; the design fixes it once, and whatever still
+  changes on its own is listed and the handoff warns about it.
+- **The handoff passes a local file, not the link.** The build's worker may not be able to open a
+  private artifact link. The Artifact tool publishes a fragment (no doctype, head or body) inside its own
+  skeleton, so the design writes `design.page.html` with `wrap-page.mjs`: the same fragment in a copy of the
+  viewer's skeleton (read back from a published artifact), and the page sets its own base styles; the check and the build both use that file, so they see what the viewer sees.
+- **More than one look before publishing, on purpose.** The Artifact guidance suggests one look and then
+  publishing. The design does up to two critique rounds because the user asked for them (decision 6 of
+  the v0.10.0 plan), and the stability capture is a build requirement, not polish. The BRIEF has a fixed shape
+  (`build all of it · enhance <file> on <route> · light only`) that stages 3 and 4 recognise, so the build
+  does not ask again for the place and the part.
+
+## D19 — Skills are confirmed, and the recommended ones are offered once
+
+**Version:** v0.10.0 · **Files:** `skills/scout/SKILL.md`, `stages/3-analyze.md`, `stages/4-your-answers.md`, `stages/5-set-up.md`, `bundle.json`, `scripts/skills-offer.mjs`, `hooks/hooks.json`, `skills/skills/SKILL.md`
+
+**Problem.** Scout used a remembered or matched skill without asking, so a skill could shape a run without
+the user knowing. And a design is only as good as the taste skills behind it, which most users don't have.
+
+**Decision.**
+
+- **No skill is used without a yes** in a build or a design: the run's one question round lists the
+  matched skills (a multi-select question) and asks about conflicts. A remembered choice is only the
+  recommendation. `/artifact-parity:scout` on its own keeps its old behaviour (it reports what it used).
+- **Conflict order:** in a design, the plugin's own recommended skill is first and recommended; the rest
+  follow by skills.sh install count, unknown last; each option shows its installs, its source and "you
+  used it before". In a build, the recommended skills never take part: they are all design skills, and D17
+  holds.
+- **The recommended set lives in `bundle.json`,** not in prose, so the offer, the design and the docs read
+  one list. A SessionStart hook (there is no install hook in Claude Code) tells Claude to offer it in the
+  first interactive session; it prints nothing when everything is installed or the user answered. It
+  cannot tell interactive sessions from automated ones by environment (both inherit the same variables),
+  so its message itself tells Claude to do nothing when it cannot ask the user.
+- **Installing never destroys.** `skills add` deletes a same-name folder, so a skill from another author is
+  never replaced without asking and is backed up to `<DATA>/backup/` first. `remove` touches only what the
+  plugin installed.
+- **Install counts** come from the search API the skills CLI itself calls, cached for 7 days; any failure
+  simply shows "installs unknown". Searches run with telemetry off and never send the user's own words.
 
 ---
 
@@ -350,3 +428,12 @@ stage 3 calls into its Steps 1-4 rather than duplicating the logic.
   artifact. See [DEVELOPMENT.md](DEVELOPMENT.md).
 - **Pass count is fixed at 3.** Nothing measures whether a 4th pass would help, or whether most runs
   converge at 2.
+- **Scroll-linked motion is measured at the top of the page only,** and GSAP or `requestAnimationFrame`
+  motion is not measured at all. Measuring at several scroll positions, or with a fixed clock, would
+  cover parallax; both need a spike first.
+- **Hover detection is occasionally unstable:** two captures of the same page have found 1 and 2 hover
+  states. compare only checks the hovers the reference found, so a build capture that misses one shows a
+  false row. Waiting for animations to finish before the hover pass (see fixtures/capture/README.md) may fix it.
+- **Hover on `::before`/`::after`, reduced-motion variants, `animation-range` and `object-fit`** are not
+  compared yet; each is a small addition to `capture.mjs` (see the v0.10.0 research notes in
+  `fixtures/capture/`).

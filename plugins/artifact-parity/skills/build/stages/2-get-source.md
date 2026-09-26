@@ -9,11 +9,17 @@ Run `progress.mjs start 2`.
 
 Create `design-ref/<screen>/`.
 
-**Re-check:** if `design-ref/<screen>/` already holds a saved `artifact.*` from an earlier run and the SOURCE is the same link or file, this is a re-check:
+**Re-check:** if `design-ref/<screen>/` already holds a saved `artifact.*` from an earlier run, get the source as below anyway, but save it as `artifact.new.<ext>` first (with the fetch script, pass `--out "design-ref/<screen>/.new"` and then move `.new/artifact.html` to `artifact.new.html`), then compare the two files byte for byte:
 
-1. Reuse the saved source.
-2. Add `re_check: yes` to NOTES.
-3. Skip straight to "Verify it is real source" below.
+```
+node -e "const f=require('fs');process.exit(f.readFileSync(process.argv[1]).equals(f.readFileSync(process.argv[2]))?0:1)" "design-ref/<screen>/artifact.<ext>" "design-ref/<screen>/artifact.new.<ext>"
+```
+
+- **Exit 0 (the same):** delete `artifact.new.<ext>`, keep the saved copy, and add `re_check: yes` to NOTES.
+- **Exit 1 (it changed,** for example a design republished to the same link or a file edited in place): replace the saved copy with the new one, add `re_check: no` to NOTES, and add a decision "the artifact changed since the last run; building the new version".
+- **The source could not be fetched this time:** reuse the saved copy, add `re_check: yes`, and add a decision "could not fetch the artifact; used the copy saved on <its file date>, which may be out of date".
+
+Then go on to "Verify it is real source" below.
 
 **Get the source, by input type:**
 
@@ -47,4 +53,5 @@ node "<ROOT>/scripts/check-source.mjs" --file "design-ref/<screen>/artifact.<ext
 1. Run `progress.mjs set --screen "<screen>"`.
 2. Run `progress.mjs done 2 --note "<file name> (<size>, real source)"`.
    - If check-source printed a warning about garbled characters, add `garbled: <count and first example>` to NOTES, so the final reply can mention it. Copy the text exactly anyway.
+   - If it printed `⚠ not measured by the parity check: <list>`, add `unmeasured: <list>` to NOTES. Those techniques are still built exactly; the final result names them so a clean score is not read as covering them.
 3. Add these to NOTES: `screen`, `source_file`, and `re_check` (yes or no).

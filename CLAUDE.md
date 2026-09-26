@@ -4,7 +4,9 @@ Memory for anyone (human or Claude) working on this repository. Read this before
 
 ## What this repository is
 
-A **Claude Code plugin marketplace** named `artifact-tools`, holding one plugin, `artifact-parity`.
+A **Claude Code plugin marketplace** named `artifact-tools`, holding one plugin, `artifact-parity`, with two
+main commands: `/artifact-parity:design` (a plain-words requirement → a published artifact) and
+`/artifact-parity:build` (an artifact → real UI in the user's codebase, measured).
 
 It is **not** an application. Almost all of it is prompt text that Claude executes at runtime, plus a
 small layer of Node scripts that do the things a prompt cannot do reliably: render a page in a real
@@ -23,6 +25,10 @@ whose only job is to keep the user's screen clean. It does no work itself — it
 **`parity-worker` subagent** once per stage group, and prints back the lines the worker returns. The
 worker reads one **stage file** per stage and follows it, calling the **Node scripts** to measure and
 to write state. Nine stages, one planned stop for questions (stage 4), then it runs to the end.
+
+`/artifact-parity:design` is the exception: it runs in the main conversation (D18), uses the same scripts
+and printer (`progress.mjs --run design`), writes only `design-ref/_designs/<slug>/`, and ends by invoking
+the build. Skills are never used without the user's yes in either command (D19).
 
 Full detail with diagrams: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -56,11 +62,18 @@ plugins/artifact-parity/
   .claude-plugin/plugin.json           name, version, description  <- BUMP version HERE
   skills/build/SKILL.md                the orchestrator
   skills/build/stages/1..9-*.md        one file per stage; the worker reads these
-  skills/scout/SKILL.md                skill matching + install (also used by stage 3)
+  skills/design/SKILL.md               the design command (runs in the main conversation)
+  skills/skills/SKILL.md               the recommended-skills offer and install
+  skills/scout/SKILL.md                skill matching + install (also used by stage 3 and design)
   skills/statusbar/SKILL.md            status line on/off
   agents/parity-worker.md              the subagent that does the work
   scripts/*.mjs                        the measuring and state layer (see below)
   scripts/lib/deps.mjs                 pinned dep versions + browser launch
+  scripts/skills-offer.mjs             the recommended-skills offer (check, hook, install commands, record)
+  scripts/wrap-page.mjs                a design fragment -> the page as the artifact viewer serves it
+  bundle.json                          the recommended skills and optional plugins (one list for everything)
+  hooks/hooks.json                     SessionStart: skills-offer.mjs --hook
+fixtures/capture/                      probe pages + noise.mjs, the capture stability check
 docs/                                  architecture, decisions, development
 ```
 

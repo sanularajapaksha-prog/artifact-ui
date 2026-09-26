@@ -38,6 +38,27 @@ flowchart TD
 conversation forever. Everything the worker touches is discarded when it returns. So the rule is
 absolute — the orchestrator reads no files and runs no commands.
 
+### The design command and the skills offer
+
+`/artifact-parity:design` (`skills/design/SKILL.md`) is the one exception to the split: it runs in the
+user's conversation, because designing is a conversation (a direction, feedback, republishing to the
+same link) and the Artifact tool only publishes to an artifact the current conversation has read or
+published (D18). It uses the same scripts and the same printer (`progress.mjs --run design`, 6 stages),
+writes only to `design-ref/_designs/<slug>/`, and ends by invoking the build with the local file and a
+fixed-shape BRIEF.
+
+```mermaid
+flowchart LR
+    U(["User"]) -->|"/artifact-parity:design REQUIREMENT WHERE"| D["design skill<br/>main conversation"]
+    D -->|"read project, scout (design mode), check, noise check"| S["scripts/*.mjs"]
+    D -->|"quickstart + publish"| A(["Artifact tool"])
+    D -->|"design.page.html + BRIEF"| B["/artifact-parity:build"]
+```
+
+The recommended skills are offered by a SessionStart hook (`hooks/hooks.json` →
+`skills-offer.mjs --hook`), which only tells Claude what is missing; the installing is done by
+`/artifact-parity:skills` after the user picks (D19).
+
 ---
 
 ## 2. Data flow diagram — Level 0 (context)
@@ -207,34 +228,36 @@ REASON:     <only for failed>
 
 ## 5. The scripts
 
-Ten scripts. `progress.mjs` verifies all of them at preflight; a missing one stops the run before
+Twelve scripts. `progress.mjs` verifies all of them at preflight; a missing one stops the run before
 anything is built.
 
 | Script | Does | Exit codes |
 |---|---|---|
-| `progress.mjs` | The only writer of user-visible run status. Prints one fixed line per call, keeps `.progress.json`, appends `progress.md`. Also the preflight gate. | 0 ok · 1 preflight failed · 2 usage |
+| `progress.mjs` | The only writer of user-visible run status. Prints one fixed line per call, keeps `.progress.json`, appends `progress.md`. Also the preflight gate. `--run design` starts a 6-stage design run; a build (the default) has 9 stages. | 0 ok · 1 preflight failed · 2 usage |
 | `setup.mjs` | Installs Playwright + pngjs + pixelmatch and a browser into the **plugin data folder**. Falls back to installed Edge or Chrome when the download is blocked. | 0 ready · 1 failed |
 | `fetch-public.mjs` | Opens a claude.ai link in a real browser, finds the artifact's sandboxed frame, saves its **original** document; falls back to the rendered DOM and says so. | 0 saved · 1 no source · 2 usage |
-| `check-source.mjs` | Decides whether a file is real artifact source rather than a summary, a login shell or an empty download. Reports fonts, scripts, keyframes; warns on garbled characters. | 0 real · 1 not real · 2 usage |
+| `check-source.mjs` | Decides whether a file is real artifact source rather than a summary, a login shell or an empty download. Reports fonts, scripts, keyframes; warns on garbled characters and names techniques the check cannot measure (`⚠ not measured by the parity check: ...`). | 0 real · 1 not real · 2 usage |
 | `detect-project.mjs` | Finds the app folder, framework, dev command and port, and the Docker service and URL. **User-stated values win and are remembered.** Writes `.parity-project.json`. | 0 found · 1 no UI app · 2 usage |
 | `scope-guard.mjs` | `--save` snapshots git before the build with a content hash per dirty file; `--check` lists files changed outside `app_dir`; `--revert` undoes only those that were clean before the run. | 0 ok · 1 outside changes · 2 usage |
 | `capture.mjs` | The big one. Renders artifact or built page in a browser and measures everything. Six modes. | 0 captured · 1 failed · 2 usage |
 | `compare.mjs` | Diffs `build.json` against `ref.json`, writes `report.md` + `result.json`, and from pass 3 writes crops. | 0 compared · 1 failed · 2 usage |
 | `list-skills.mjs` | Lists installed Claude Code skills — user, project, legacy commands and plugin skills — following symlinks. | 0 |
+| `skills-offer.mjs` | The recommended-skills offer: `--check` (local files only), `--hook` (SessionStart JSON or nothing), `--commands`, `--backup`, `--record`, `--remove-commands`, `--installs` (the only network use, cached 7 days), `--self-test`. Reads `bundle.json`. | 0 ok · 1 listing failed · 2 usage |
+| `wrap-page.mjs` | Wraps a design fragment in the artifact viewer's document skeleton (`design.html` → `design.page.html`), so the check and the build see the published page. | 0 written · 1 bad input · 2 usage |
 | `statusline.mjs` / `statusline-setup.mjs` | Renders the live status bar from `.progress.json`; installs and removes it with a settings backup. | 0 |
 
 ### `capture.mjs` modes
 
 | Mode | Target | Writes / prints |
 |---|---|---|
-| `ref` | artifact file | `ref.json`, `ref-map.md`, `ref-<size>.png` |
+| `ref` | artifact file | `ref.json`, `ref-map.md`, `ref-<size>.png`; `--light-only` leaves out the dark variant; prints `⚠ fonts not loaded` for declared fonts that never loaded |
 | `build` | preview URL | `build.json`, `build-<size>.png` — reuses the sizes, hover targets and token names from `ref.json`, so **`ref` must run first** |
 | `probe` | any URL | prints `open` or `login needed` |
 | `login` | any URL | saves the session to `<DATA>/auth/<host>.json` — cookies and storage, never a password |
 | `login-file` | a URL | creates an owner-only empty file for the user to fill; prints its path |
 | `env-search` | project dir | lists env files holding login key pairs, **key names only** |
 
-Measured at **1440, 768 and 390**, plus **1440 dark** when the artifact has a dark theme.
+Measured at **1440, 768 and 390**, plus **1440 dark** when the artifact has a dark theme and the reference was not captured with `--light-only`.
 
 ---
 
@@ -280,6 +303,11 @@ design-ref/
     result.json             the scores — the only source of a number
     ref-<size>.png / build-<size>.png
     crops/                  pass 3 only: reference | build | diff
+  _designs/<slug>/          /artifact-parity:design output (never a screen folder: it starts with "_")
+    design.html             the design as published: a fragment, no doctype/head/body
+    design.page.html        the same inside the viewer's skeleton; what the check and the build use
+    design.meta.json        requirement, case, place, stack, dark, placeholders, link
+    check/ check-a/ check-b/ its captures; check-a holds the stability compare
 ```
 
 ### In the plugin data folder
@@ -292,7 +320,10 @@ package.json         pinned: playwright 1.63.0, pngjs 7.0.0, pixelmatch 7.2.0
 node_modules/        never the user's project
 auth/<host>.json     saved browser sessions, never passwords
 login/login.env      the owner-only login file, deleted right after use
-skill-choices.json   remembered scout choices
+skill-choices.json   remembered scout choices (design runs use "design/<label>" keys)
+skill-offer.json     the recommended-skills answer, the skills the plugin installed, "keep mine" answers
+installs-cache.json  skills.sh install counts, 7 days
+backup/<name>-<time> a same-name skill saved before it was replaced
 ```
 
 ### `analysis.json` — stage 3 → stage 4
@@ -304,7 +335,9 @@ skill-choices.json   remembered scout choices
   "states":    [ { "clicks": [], "shows": "..." } ],
   "recommended_clicks": [],
   "parts":     [ { "elements": "r-023..r-055", "label": "step-tracker", "count": 33, "why": "..." } ],
-  "skills":    { "chosen": [], "missing": [] },
+  "skills":    { "chosen": [], "conflicts": [], "missing": [] },
+  "dark":      { "artifact": true, "app": "media|class|none" },
+  "fonts_missing": [],
   "libraries": [ { "name": "...", "why": "..." } ],
   "login":     { "dev": "open|login needed", "docker": "...", "env_pairs": [], "last_env": null },
   "docker":    { "container": "...", "service": "...", "url": "...", "last_urls": [] },
@@ -323,8 +356,9 @@ Every list is **best-first**; the first entry becomes the recommended option in 
   "place": { "mode": "enhance|new", "file": "...", "route": "...", "url": "...", "typed": null },
   "part": { "elements": "r-023..r-055", "sections": null, "clicks": ["#tabTimeline"] },
   "login": { "method": "none|window|env|env-search|login-file", "env": null, "user_key": null, "pass_key": null },
-  "skills": [ { "part": "...", "install": "owner/repo@skill | skip" } ],
+  "skills": [ { "part": "...", "use": "<skill>|none", "install": "owner/repo@skill | skip | n/a" } ],
   "libraries": "install|skip|n/a",
+  "dark": "light-only|both|n/a",
   "docker": { "rebuild": true, "url": "http://localhost:8080" },
   "leftovers": "keep|delete|n/a",
   "outside_frontend": "revert|ask|keep",
@@ -342,16 +376,18 @@ At most 8, each with 2-4 options, recommendation first and labelled `(Recommende
 | id | Asked when |
 |---|---|
 | `app` | several app candidates |
-| `place` | always |
-| `part` | always |
+| `place` | always, unless a BRIEF from `/artifact-parity:design` names it |
+| `part` | always, unless that BRIEF says `build all of it` |
 | `login` | a login gate was found |
-| `skill-1`, `skill-2` | a part has no matching installed skill — at most 2 |
+| `skills` | a skill was matched or a surplus conflict needs a yes — a multi-select question; never dropped |
+| `skill-1`, `skill-2` | a part has a conflict or no matching installed skill — at most 2 together |
 | `libs` | the artifact needs a library the app lacks |
+| `dark` | the artifact has a dark theme and the app has none (or class-based dark) |
 | `docker` | a frontend container was detected |
 | `leftovers` | an earlier run of this screen left files |
 | `end` | always, unless the 8 are used up |
 
-Over 8, drop `end` first, then `libs`; each dropped question uses its recommended option and is
+Over 8, drop `end` first, then `libs`, then `dark` (light only), then `leftovers` (keep); each dropped question uses its recommended option and is
 recorded in `decisions` so the user still sees the choice.
 
 ---

@@ -32,10 +32,10 @@ Arguments: `$ARGUMENTS`
 
 ## Run facts
 
-Keep a short `RUN FACTS` block, at most 15 lines, and send it with every worker call:
+Keep a short `RUN FACTS` block, at most 15 lines (several short facts may share a line, separated by ` · `), and send it with every worker call:
 
 - **Start with:** `SOURCE` and `BRIEF`.
-- **After each worker reply:** add or update the facts from its `NOTES`, for example `screen`, `source_file`, `re_check`, `analysis`, `answers`, `mode`, `app_dir`, `stack`, `preview_url`, `target_files` or `target`, `docker`, `login`, `leftovers`, `skills`, `scope_file`, the scores, `clean`, `files`, `left_rows`, `decisions`.
+- **After each worker reply:** add or update the facts from its `NOTES`, for example `screen`, `source_file`, `re_check`, `unmeasured`, `fonts_missing`, `analysis`, `answers`, `mode`, `app_dir`, `stack`, `preview_url`, `target_files` or `target`, `docker`, `login`, `leftovers`, `skills`, `dark`, `scope_file`, the scores, `clean`, `files`, `left_rows`, `decisions`.
 
 ## Stage order
 
@@ -66,9 +66,9 @@ If the worker agent isn't available, tell the user in one line to restart Claude
 1. **Print every line under `LINES:`** exactly as returned, each on its own line.
 2. **Handle the STATUS:**
    - **`done`:** update RUN FACTS and make the next call.
-   - **`needs-answers`** (stage 4): the reply has a `QUESTIONS` block, one question per `[id] question` line followed by its `- label — description` options (2 to 4 each).
-     1. Ask them all with AskUserQuestion, up to 4 questions per call, in the order given (a second call for questions 5-8). Use the `[id]` as the header (max 12 characters) and keep the option labels and descriptions as given; the user can always type "Other".
-     2. Call the worker again with `Run stage(s): 4-5`, the facts, and an `ANSWERS:` block, one `[id] <chosen label or typed text>` line per question.
+   - **`needs-answers`** (stage 4): the reply has a `QUESTIONS` block, one question per `[id] question` line followed by its `- label — description` options (2 to 4 each). A line `[id] (multi) question` is a multi-select question.
+     1. Ask them all with AskUserQuestion, up to 4 questions per call, in the order given (a second call for questions 5-8). Use the `[id]` as the header (max 12 characters) and keep the option labels and descriptions as given; the user can always type "Other". Set `multiSelect: true` for a `(multi)` question.
+     2. Call the worker again with `Run stage(s): 4-5`, the facts, and an `ANSWERS:` block, one `[id] <chosen label or typed text>` line per question. For a `(multi)` question, give every ticked label, comma-separated, or `none` when nothing is ticked.
      3. Add `answers: design-ref/<screen>/answers.json` to RUN FACTS. Never copy a typed username or password into RUN FACTS, later calls, or anything you print; it goes only into that one `ANSWERS:` block.
    - **`needs-user`** (a blocker after stage 4 - rare): ask the `QUESTION`, with its options as choices, and wait for the answer. Then call the worker again for the same stage, adding `USER ANSWER: <answer>` below the facts. The same credential rule applies.
    - **`failed`:** print the `REASON` line and stop. Do not work around the failure yourself.
@@ -82,4 +82,4 @@ After stage 9, print one short block:
 Score: <final score> measured on <measured_on> · <"0 differences left" or the left_rows, one per line>
 ```
 
-If NOTES list `unwired` or `kept_extra`, add one line each so the user knows what still shows sample content and which existing parts were kept. If NOTES list `decisions` (choices the worker made on its own after stage 4), add them under `Decisions I made:`, one per line, so the user can undo any. Then add "Run one more pass?" only if rows remain. Mention once that the `data-ref` attributes can be stripped from production builds.
+If NOTES list `unwired` or `kept_extra`, add one line each so the user knows what still shows sample content and which existing parts were kept. If RUN FACTS have `unmeasured`, add `Not measured: <unmeasured>` (built exactly, but outside what the score checks). If `dark` is `light-only`, add `Dark: not built or measured (your choice)`. If RUN FACTS have `fonts_missing`, add `Fonts the artifact failed to load: <families> (measured with a fallback font)`. If NOTES list `decisions` (choices the worker made on its own after stage 4), add them under `Decisions I made:`, one per line, so the user can undo any. Then add "Run one more pass?" only if rows remain. Mention once that the `data-ref` attributes can be stripped from production builds.

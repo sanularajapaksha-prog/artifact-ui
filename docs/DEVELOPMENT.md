@@ -102,7 +102,20 @@ node <PLUGIN>/scripts/check-source.mjs --file some.html       # 0 real · 1 not 
 node <PLUGIN>/scripts/list-skills.mjs --json
 node <PLUGIN>/scripts/progress.mjs show
 PARITY_ASCII=1 node <PLUGIN>/scripts/progress.mjs start 3     # check the ASCII fallback
+node <PLUGIN>/scripts/skills-offer.mjs --self-test            # the offer logic, in temp folders
+PARITY_OFFER_SIMULATE_MISSING=impeccable node <PLUGIN>/scripts/skills-offer.mjs --hook --data <tmp>
+                                                              # see the session-start offer without uninstalling anything
 ```
+
+### Capture noise check - a minute or two, needs the plugin's browser
+
+```bash
+node fixtures/capture/noise.mjs js.html "scroll.html?smooth=1" css.html loader.html
+```
+
+Captures each probe page twice and compares the two. Run it before and after any change to
+`capture.mjs`; pass `--scripts <dir>` to run an older copy of the scripts for a baseline. What each page
+probes, and what the capture cannot measure, is in [fixtures/capture/README.md](../fixtures/capture/README.md).
 
 ### The real check — a full build
 
@@ -177,6 +190,9 @@ No formal semver contract, but the history is consistent:
 | Project detection | `scripts/detect-project.mjs` | the flag table in `stages/3-analyze.md` |
 | Skill matching | `skills/scout/SKILL.md` | `stages/3-analyze.md` calls its Steps 1-4 |
 | The worker's reply format | `agents/parity-worker.md` | `skills/build/SKILL.md` parses it — change both |
+| The design command | `skills/design/SKILL.md` | its stage names live in `progress.mjs` `RUNS.design`; its handoff BRIEF shape is copied in `stages/3-analyze.md` and `stages/4-your-answers.md` — change all three |
+| The recommended skills | `bundle.json` | README "Recommended skills" table; `skills-offer.mjs --self-test` |
+| The session-start offer | `hooks/hooks.json`, `scripts/skills-offer.mjs` | the hook must stay silent and exit 0 on any error |
 
 **Rule of thumb:** a stage file and the script it calls are one unit. Changing one without the other is
 the most common way to break a run.
@@ -197,8 +213,9 @@ Roughly in order of value. Nothing here is committed to.
 
 ### Reliability
 
-- **A fixture-based test.** A tiny artifact plus an expected `result.json` would catch a broken
-  `compare.mjs` in seconds instead of in a 15-minute run. The highest-value item here.
+- **A fixture-based test.** `fixtures/capture/noise.mjs` checks capture's stability; a tiny artifact plus
+  an expected `result.json` would also catch a broken `compare.mjs` in seconds instead of in a 15-minute
+  run. The highest-value item here.
 - **A stage-file linter.** Check each stage file for the things that are currently only convention: a
   `progress.mjs start <n>` at the top, a `done`/`fail`/`wait` on every exit path, and no `--note` that
   contains a digit followed by `%` (a D3 violation, mechanically detectable).

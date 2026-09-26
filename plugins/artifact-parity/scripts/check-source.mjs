@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Decides whether a file is the artifact's REAL source (markup + styles), not a
 // WebFetch summary, a claude.ai login/app-shell page, or an empty download.
-// Also reports useful facts (fonts, scripts, keyframes) and warns about
-// garbled characters that an exact copy would otherwise reproduce.
+// Also reports useful facts (fonts, scripts, keyframes), warns about garbled
+// characters that an exact copy would otherwise reproduce, and names techniques
+// the parity measurement cannot verify (GSAP, scroll-driven motion, canvas...).
 //
 // Usage: node check-source.mjs --file <path>
 // Exit codes: 0 real source, 1 not real source (reason printed), 2 usage error.
@@ -67,6 +68,24 @@ const garbled = [];
 lines.forEach((l, n) => { for (const m of l.matchAll(garbledRe)) garbled.push(`line ${n + 1}: "${m[0]}"`); });
 const replacement = count(/\uFFFD/g);
 
+// --- techniques the parity measurement can't verify (capture sees CSS/WAAPI motion at scroll 0 only) ---
+const unmeasured = [
+  [/\bgsap\b|ScrollTrigger/, 'GSAP tweens'],
+  [/requestAnimationFrame/, 'requestAnimationFrame motion'],
+  [/animation-timeline|\bview\(\s*\)|\bscroll\(\s*\)/, 'scroll-driven animations (only the top-of-page state)'],
+  [/IntersectionObserver/, 'scroll reveals (only after one scroll pass)'],
+  [/scroll-behavior\s*:\s*smooth/, 'scroll-behavior: smooth'],
+  [/light-dark\(/, 'light-dark() colors (dark mode not detected)'],
+  [/<animate(Transform|Motion)?[\s>]/, 'SVG SMIL animation'],
+  [/<canvas[\s>]|WebGLRenderer|\bthree(\.module)?(\.min)?\.js/, 'canvas/WebGL (box only)'],
+  [/<video[\s>]/, 'video (box only)'],
+  [/hold-loader/, 'the loading screen (removed on load, before the check)'],
+].filter(([re]) => re.test(text)).map(([, what]) => what);
+// Google Fonts sheets only hold @font-face, which capture never needs to read.
+const unreadableSheets = [...text.matchAll(/<link\b[^>]*rel=["']?stylesheet[^>]*>/gi)]
+  .filter((m) => !/crossorigin/i.test(m[0]) && /href=["']?https?:/i.test(m[0]) && !/fonts\.googleapis\.com/i.test(m[0])).length;
+if (unreadableSheets) unmeasured.push(`${unreadableSheets} stylesheet link${unreadableSheets > 1 ? 's' : ''} without crossorigin (rules unreadable)`);
+
 const kind = isJsx ? 'React component' : 'HTML';
 const parts = [`${kind}, ${kb} KB, ${lines.length} lines`];
 if (fonts.size) parts.push(`fonts: ${[...fonts].join(', ')}`);
@@ -78,3 +97,4 @@ if (garbled.length) {
   console.log(`⚠ ${garbled.length} garbled character${garbled.length > 1 ? 's' : ''} in the source (${garbled.slice(0, 3).join(', ')}) - an exact copy would reproduce them`);
 }
 if (replacement) console.log(`⚠ ${replacement} unreadable character${replacement > 1 ? 's' : ''} (U+FFFD) in the source`);
+if (unmeasured.length) console.log(`⚠ not measured by the parity check: ${unmeasured.join(', ')}`);

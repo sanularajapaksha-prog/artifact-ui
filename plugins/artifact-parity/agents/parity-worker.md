@@ -29,7 +29,7 @@ The main conversation sends you:
 
 - `Run stage(s): <n>` or `<n>-<m>`
 - `RUN FACTS:` everything known so far, including SOURCE (link or file), BRIEF (the user's own words; may be empty), screen, source_file, stack, preview_url, skills, scope_file and scores
-- Sometimes `ANSWERS:` the user's answers to the stage 4 questions, one `[id] answer` line each.
+- Sometimes `ANSWERS:` the user's answers to the stage 4 questions, one `[id] answer` line each (a multi-select answer lists the ticked labels, comma-separated, or `none`).
 - Sometimes `USER ANSWER:` the user's reply to a blocker question. Continue the same stage using it.
 
 ## How to work
@@ -68,7 +68,7 @@ LINES:
 NOTES:
 <key: value lines the next stages need, short>
 QUESTIONS:
-<only for needs-answers: for each question, a line "[id] question", then its 2-4 options, each on its own line as "- label — description">
+<only for needs-answers: for each question, a line "[id] question" (or "[id] (multi) question" for a multi-select one), then its 2-4 options, each on its own line as "- label — description">
 QUESTION:
 <only for needs-user: one short question, then each option on its own line starting with "- ">
 REASON:

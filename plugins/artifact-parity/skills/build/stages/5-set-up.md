@@ -10,11 +10,13 @@ Run `progress.mjs start 5`, then read `design-ref/<screen>/answers.json` and `an
 
 ## 2. Reference state and scope
 
-- If `answers.part.clicks` differ from the clicks of the last reference capture, capture the reference again with them:
+- If `answers.part.clicks` differ from the clicks of the last reference capture, **or** `answers.dark` is `light-only`, **or** `answers.dark` is `both` while `analysis.dark.app` is `class` (capture can't switch a class-based dark mode), capture the reference again with the clicks, adding `--light-only` in the last two cases so dark is neither measured nor scored. In the `class` case, also add a decision: "dark mode ported but not measured (class-based)".
 
 ```
-node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode ref --target "<source_file>" --out "design-ref/<screen>" [--click "<each click>" ...]
+node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode ref --target "<source_file>" --out "design-ref/<screen>" [--click "<each click>" ...] [--light-only]
 ```
+
+  Every later capture in this run that re-captures the reference must pass the same `--light-only`. The build capture needs nothing extra: it reuses the reference's screen sizes.
 
 - Write `design-ref/<screen>/scope.json` (allowed keys only: `brief`, `sections`, `elements`, `clicks`, `build_clicks`, `note`):
 
@@ -29,18 +31,18 @@ node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode ref --target "<source_f
 
 Log in on each URL that needs it (the dev URL, and the Docker URL when Docker is rebuilt at the end), using the chosen method:
 
-- `window`: `capture.mjs --mode login --target "<url>"` - the user logs in in the browser window. The user answered moments ago, so they are still there.
-- `env`: `capture.mjs --mode login --target "<url>" --env "<path>"` (plus `--user-key` / `--pass-key` if stage 3 found several pairs in that file).
+- `window`: `node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode login --target "<url>"` - the user logs in in the browser window. The user answered moments ago, so they are still there.
+- `env`: `node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode login --target "<url>" --env "<path>"` (plus `--user-key` / `--pass-key` if stage 3 found several pairs in that file).
 - `env-search`: the same with the file and keys shown in the chosen option.
-- `login-file`: `capture.mjs --mode login --target "<url>" --login-file --keep-login-file` for every URL but the last; the last one without `--keep-login-file`, so the file is deleted once all logins are done.
+- `login-file`: `node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode login --target "<url>" --login-file --keep-login-file` for every URL but the last; the last one without `--keep-login-file`, so the file is deleted once all logins are done.
 
-Then probe each URL again (`--mode probe`); it must print `open`. A login that fails, or a probe still saying `login needed`, is a **blocker**: run `progress.mjs wait 5 --note "login failed"` and return `needs-user` with the one-line reason and the four login options from stage 4. After an `env` login succeeds, remember the path (never the values): `detect-project.mjs --login-env "<path>"`.
+Then probe each URL again (`node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode probe --target "<url>"`); it must print `open`. A login that fails, or a probe still saying `login needed`, is a **blocker**: run `progress.mjs wait 5 --note "login failed"` and return `needs-user` with the one-line reason and the four login options from stage 4. After an `env` login succeeds, remember the path (never the values): `detect-project.mjs --login-env "<path>"`.
 
 ## 4. Skills and libraries
 
-- For each `answers.skills` entry with an `owner/repo@skill`: install it (scout Step 5b, steps 4-5: `npx -y skills add <owner/repo@skill> -g -y -a claude-code`, then check it's listed). If it fails, try that part's next candidate from `analysis.json`; if none works, skip the part and add a decision. `skip`: save `"skip"` for that part as scout describes.
+- For each `answers.skills` entry with an `owner/repo@skill` under `install`: install it (scout Step 5b, steps 4-5). Split the id at the last `@` and quote both parts: `npx -y skills@1.7.0 add "<owner/repo>" -s "<skill>" -g -y -a claude-code`, then check it's listed. When it lands, add it to the plugin's list: `node "<ROOT>/scripts/skills-offer.mjs" --track <skill> --data "<DATA>"`. If it fails, don't install another candidate (the user didn't pick it): set that part's `use` to `none` and add a decision. If a skill with the same name from another source is already installed, don't replace it (that needs the user's yes): skip the install, set `use` to `none`, and add a decision. `install: skip`: save `"skip"` for that part as scout describes.
 - `answers.libraries` is `install`: install them from `app_dir` with the app's own package manager (only the frontend's package files change). If the install fails, continue without them and add a decision.
-- Add `skills` to NOTES: `name = path to its SKILL.md` for every chosen and installed skill.
+- Add `skills` to NOTES: `name = path to its SKILL.md` **only** for entries whose `use` names a skill that is installed now. A part with `use: none` gets no skill: the user said no, so it is built without one. Save each confirmed skill for its part as scout Step 7 describes.
 
 ## 5. Dev server, remembered choices, frontend baseline
 
@@ -54,4 +56,4 @@ node "<ROOT>/scripts/scope-guard.mjs" --save --app "<app_dir>" --out "design-ref
 
 ## On success
 
-Run `progress.mjs done 5 --note "<mode>: <target> · <skills installed or none> · <login method or no login>"`. Add to NOTES: `mode`, `app_dir`, `stack`, `dev_command`, `preview_url`, `target_files` or `target`, `scope_file`, `in_scope_elements`, `clicks`, `build_clicks`, `skills`, `docker`, `login`, `leftovers`, `decisions`.
+Run `progress.mjs done 5 --note "<mode>: <target> · <skills in use or none> · <login method or no login>"`. Add to NOTES: `mode`, `app_dir`, `stack`, `dev_command`, `preview_url`, `target_files` or `target`, `scope_file`, `in_scope_elements`, `clicks`, `build_clicks`, `skills`, `dark` (`light-only` when chosen), `docker`, `login`, `leftovers`, `decisions`.

@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stylesheet source probe</title>
+<script>
+const P=new URLSearchParams(location.search);
+document.write('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/hover.css/2.3.1/css/hover-min.css"'+(P.get('co')==='1'?' crossorigin="anonymous"':'')+'>');
+document.write('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"'+(P.get('co')==='1'?' crossorigin="anonymous"':'')+'>');
+if(P.get('local')==='1')document.write('<link rel="stylesheet" href="sheets-local.css">');
+</script>
+<style>
+:root{color-scheme:light dark}
+body{margin:0;font-family:system-ui,sans-serif;background:light-dark(#ffffff,#111111);color:light-dark(#111111,#eeeeee)}
+section{padding:24px}
+</style></head><body>
+<section id="s-lib"><h2>Library CSS</h2><span id="grow" class="hvr-grow">grow on hover</span><div id="bounce" class="animate__animated animate__bounce animate__infinite">bounce</div></section>
+<section id="s-local"><h2>Local CSS</h2><span id="lk">local hover</span></section>
+</body></html>

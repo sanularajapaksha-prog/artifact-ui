@@ -13,8 +13,9 @@ Run `progress.mjs start 6`.
 1. **Read the plan inputs.** Read the artifact source once, fully. Then read `design-ref/<screen>/scope.json` and the in-scope part of `ref-map.md`. Build only the in-scope sections. In `enhance` mode, also read every file in `target_files` fully before changing anything.
 2. **Read the chosen skills.** Read the `SKILL.md` of each skill listed in the facts. Apply each one only to its own part. The artifact's values and these rules always win over a skill's advice.
 3. **Set up global prerequisites first.** These cascade into everything:
-   - fonts: the same families, weights and loading source as the artifact
+   - fonts: the same families, weights and loading source as the artifact. Exception: a family the BRIEF names as the app's own (`fonts: <family> from the app`, written by `/artifact-parity:design`) keeps the app's existing loading; don't copy the artifact's `@font-face` for it.
    - theme variables and `@keyframes`
+   - dark mode: when the facts say `dark: light-only`, don't port the artifact's dark rules (its `@media (prefers-color-scheme: dark)` and `[data-theme="dark"]` blocks); build the light theme only and add a decision saying so
    - any base styles the artifact relies on
 
    If the project's global CSS (reset, base line-height, box-sizing, body font) differs from the artifact's, correct it at the component root. Do not edit global styles for the whole app.

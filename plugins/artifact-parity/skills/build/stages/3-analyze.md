@@ -27,6 +27,15 @@ node "<ROOT>/scripts/detect-project.mjs" --project "." [user-stated values as fl
 
 ## 2. The place
 
+**A BRIEF written by `/artifact-parity:design`** has this fixed shape, parts separated by ` · `:
+
+```
+build all of it · enhance <file> on <route> · light only
+build all of it · new at <file> on <route>
+```
+
+(`light only` appears only when the app has no dark mode; `fonts: <family> from the app` and `fallback font: <family>` may follow, and so may known phrases such as "the app is in apps/web".) When the BRIEF has `enhance <file>` or `new at <file>`, that place is the first candidate, with the `why` "named in the brief"; still find its real `url` as below.
+
 Search the router config or pages folder, component file names, page titles, headings and nav labels for the place the BRIEF names (with no place named, use the artifact's title and headings).
 
 - Record up to 3 **place candidates**, best first. Each: `mode` (`enhance` when an existing component there matches the artifact, else `new`), `file`, `route`, a real `url` on the dev server (for a route with `:id`, open the list page and take a real link; if none, leave `url` empty and say so), and a one-line `why`.
@@ -40,6 +49,8 @@ node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode ref --target "<source_f
 
 - Read `ref-map.md` (not `ref.json`). If the part the BRIEF names isn't there, or the BRIEF names a mode or tab ("timeline tab", "preview mode"), find the control under **State controls** that shows it and capture again with `--click "<control text or #id>"` (repeat for several clicks, in order). The last capture must be the state you recommend.
 - Record `states`: each state you captured (its clicks and what it shows), and `recommended_clicks`.
+- If capture printed `⚠ fonts not loaded: <families>`, record them under `fonts_missing` (not `problems`, which become questions): the reference itself shows a fallback font for those families. A design BRIEF's `fallback font: <family>` goes into `fonts_missing` too.
+- **Dark mode.** The artifact has a dark theme when `ref-map.md`'s `Screen sizes` line lists `1440 dark`. Check the app for one: a Tailwind `darkMode` setting, `.dark` or `[data-theme]` rules, a `prefers-color-scheme: dark` media rule, or a theme library such as next-themes. Record `dark`: `{ "artifact": true|false, "app": "media" | "class" | "none" }` (`class` means a class or attribute switches it; capture can only switch media-based dark).
 
 ## 4. The part
 
@@ -51,10 +62,12 @@ From the **Parts** list and the element lines in `ref-map.md`, record up to 3 **
 
 ## 5. Skills
 
-Follow `<ROOT>/skills/scout/SKILL.md` Steps 1-4 (list installed skills and match), with these parts: the UI framework, the styling system with its major version, **motion whenever the artifact moves at all** (search the source for `@keyframes`, `animation`, `transition`, animated `::before`/`::after`, animation libraries; name the part by what it uses and how this project must write it, for example `animation: CSS @keyframes loops on ::after in React + Tailwind v4`), and the icon library.
+Follow `<ROOT>/skills/scout/SKILL.md` Steps 1-4 and Step 4b (list installed skills, match, and order the candidates of each part), with these parts: the UI framework, the styling system with its major version, **motion whenever the artifact moves at all** (search the source for `@keyframes`, `animation`, `transition`, animated `::before`/`::after`, animation libraries; name the part by what it uses and how this project must write it, for example `animation: CSS @keyframes loops on ::after in React + Tailwind v4`), and the icon library.
 
-- Implementation skills only; never design-taste skills.
-- Record matched skills under `skills.chosen` (name and `SKILL.md` path).
+- Implementation skills only; never design-taste skills (none of the plugin's own recommended skills in `<ROOT>/bundle.json` qualifies for a build).
+- **No skill is used without the user's yes.** Every matched skill goes into the stage 4 questions, so record it with what the question needs.
+- Record each part with one clear match under `skills.chosen`: `part`, `skill`, `path`, `source`, `installs` (from scout Step 4b; `null` when unknown), `used_before`.
+- Record each part with a conflict (scout Step 4b) under `skills.conflicts`, candidates best first, each with `skill`, `path`, `source`, `installs`, `used_before`.
 - For each part with no match, run scout's Step 5b search (steps 1-2 only: search and pick up to 3 candidates; **don't install**) and record them under `skills.missing` with install counts and skills.sh links.
 
 ## 6. Libraries
@@ -94,8 +107,11 @@ Write `design-ref/<screen>/analysis.json`:
   "states":    [ { "clicks": [], "shows": "..." } ],
   "recommended_clicks": [],
   "parts":     [ { "elements": "r-023..r-055", "label": "step-tracker", "count": 33, "why": "..." } ],
-  "skills":    { "chosen": [ { "part": "...", "skill": "...", "path": "..." } ],
+  "skills":    { "chosen": [ { "part": "...", "skill": "...", "path": "...", "source": "owner/repo", "installs": 15100, "used_before": false } ],
+                 "conflicts": [ { "part": "...", "candidates": [ { "skill": "...", "path": "...", "source": "...", "installs": null, "used_before": true } ] } ],
                  "missing": [ { "part": "...", "candidates": [ { "id": "owner/repo@skill", "installs": "15.1K", "url": "..." } ] } ] },
+  "dark":      { "artifact": true, "app": "none" },
+  "fonts_missing": [],
   "libraries": [ { "name": "...", "why": "..." } ],
   "login":     { "dev": "open | login needed", "docker": "open | login needed | n/a", "env_pairs": [], "last_env": null },
   "docker":    { "container": "...", "service": "...", "url": "...", "last_urls": [] },

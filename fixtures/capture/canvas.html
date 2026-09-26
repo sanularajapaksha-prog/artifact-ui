@@ -1,0 +1,32 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Canvas probe</title>
+<script>if(new URLSearchParams(location.search).get('v')==='b')document.documentElement.classList.add('vb');</script>
+<style>
+body{margin:0;font-family:system-ui,sans-serif}
+section{padding:24px;border-bottom:1px solid #ddd}
+#vid{width:300px;height:150px;object-fit:cover;background:#000}
+.vb #vid{object-fit:contain}
+#three{width:300px;height:200px}
+</style></head><body>
+<section id="s-2d"><h2>2D canvas</h2><canvas id="c2d" width="300" height="150"></canvas></section>
+<section id="s-three"><h2>three.js</h2><div id="three"></div><p id="glflag">?</p></section>
+<section id="s-video"><h2>Video</h2><video id="vid" muted loop autoplay playsinline></video></section>
+<script>
+const vb=document.documentElement.classList.contains('vb');
+const c=document.getElementById('c2d');const g=c.getContext('2d');
+(function draw(t){g.fillStyle='#fff';g.fillRect(0,0,300,150);g.fillStyle=vb?'#dc2626':'#2563eb';g.fillRect((t/5)%260,50,40,40);requestAnimationFrame(draw);})(0);
+document.getElementById('vid').srcObject=c.captureStream(30);
+</script>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+const vb=document.documentElement.classList.contains('vb');
+const flag=document.getElementById('glflag');
+try{
+  const r=new THREE.WebGLRenderer({antialias:true});r.setSize(300,200);document.getElementById('three').appendChild(r.domElement);
+  const s=new THREE.Scene();const cam=new THREE.PerspectiveCamera(50,1.5,.1,10);cam.position.z=3;
+  const m=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshNormalMaterial({wireframe:vb}));s.add(m);
+  r.setAnimationLoop((t)=>{m.rotation.x=t/1000;m.rotation.y=t/1300;r.render(s,cam);});
+  flag.textContent='webgl ok';
+}catch(e){flag.textContent='webgl failed: '+e.message;}
+</script>
+</body></html>

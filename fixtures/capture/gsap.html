@@ -1,0 +1,32 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GSAP probe</title>
+<script>if(new URLSearchParams(location.search).get('v')==='b')document.documentElement.classList.add('vb');</script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+<style>
+body{margin:0;font-family:system-ui,sans-serif}
+section{padding:40px;min-height:300px;border-bottom:1px solid #ddd;position:relative;overflow:hidden}
+.box{width:80px;height:80px;background:#f97316;border-radius:8px;margin:8px 0}
+.tall{min-height:1200px}
+#sy{position:fixed;top:8px;right:8px;background:#fff;padding:4px 8px;font:12px monospace;margin:0}
+</style></head><body>
+<p id="sy">scrollY=0</p>
+<section id="hero"><h1>GSAP hero</h1><div id="gin" class="box"></div><div id="gloop" class="box"></div><div id="gpartop" class="box"></div></section>
+<section class="tall" id="s-par"><h2>Parallax scrub true</h2><div id="gpar" class="box"></div></section>
+<section class="tall" id="s-scrub1"><h2>Parallax scrub 1</h2><div id="gscrub1" class="box"></div></section>
+<section id="s-rev"><h2>Reveal</h2><div id="grev" class="box"></div></section>
+<section id="s-pin"><h2>Pinned</h2><div id="gpin" class="box"></div></section>
+<section class="tall" id="s-after"><h2>After</h2></section>
+<script>
+const vb=document.documentElement.classList.contains('vb');
+gsap.registerPlugin(ScrollTrigger);
+addEventListener('scroll',()=>{document.getElementById('sy').textContent='scrollY='+Math.round(scrollY);},{passive:true});
+gsap.from('#gin',{opacity:0,y:40,duration:1,ease:vb?'power4.out':'power2.out'});
+gsap.to('#gloop',{rotation:360,duration:2,ease:'none',repeat:-1});
+gsap.to('#gpartop',{y:vb?200:100,ease:'none',scrollTrigger:{trigger:'#hero',start:'top top',end:'bottom top',scrub:true}});
+gsap.to('#gpar',{y:vb?-400:-200,ease:'none',scrollTrigger:{trigger:'#s-par',start:'top bottom',end:'bottom top',scrub:true}});
+gsap.to('#gscrub1',{y:-300,ease:'none',scrollTrigger:{trigger:'#s-scrub1',start:'top bottom',end:'bottom top',scrub:1}});
+gsap.from('#grev',{opacity:0,y:60,duration:vb?1.2:.6,scrollTrigger:{trigger:'#s-rev',start:'top 80%'}});
+ScrollTrigger.create({trigger:'#s-pin',start:'top top',end:'+=600',pin:true});
+</script>
+</body></html>

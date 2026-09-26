@@ -1,0 +1,4 @@
+@media (prefers-color-scheme: dark){:root{--local-bg:#000000}}
+:root{--local-bg:#fafafa}
+#s-local{background:var(--local-bg)}
+#lk:hover{color:#dc2626}

@@ -4,7 +4,8 @@
 // layout, theme tokens, hover states and motion, at several screen sizes.
 //
 // Usage:
-//   capture.mjs --data <dir> --mode ref   --target <artifact file or URL> --out <dir> [--widths 1440,768,390]
+//   capture.mjs --data <dir> --mode ref   --target <artifact file or URL> --out <dir> [--widths 1440,768,390] [--light-only]
+//                                                        --light-only: skip the dark variant (the app has no dark mode)
 //   capture.mjs --data <dir> --mode build --target <preview URL>          --out <dir>
 //   capture.mjs --data <dir> --mode probe --target <URL>   prints "open" or "login needed"
 //   capture.mjs --data <dir> --mode login --target <URL>   opens a browser window; the user logs in
@@ -364,6 +365,8 @@ function prInit() {
     + ['d', 'points', 'cx', 'cy', 'r', 'rx', 'ry', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'width', 'height'].map((a) => n.getAttribute(a) ?? '').join(',')).join('|'));
   const ms = (list) => list.split(',').map((t) => (t.trim().endsWith('ms') ? parseFloat(t) : parseFloat(t) * 1000) || 0);
   const raf2 = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  // Two rendered frames, capped so a page that stops rendering can't hang the capture.
+  const frames = () => Promise.race([raf2(), new Promise((r) => setTimeout(r, 500))]);
 
   function eachRule(fn) {
     const walk = (rules) => { for (const r of rules) { fn(r); if (r.cssRules) walk(r.cssRules); } };
@@ -433,7 +436,7 @@ function prInit() {
     },
 
     async settle() {
-      window.scrollTo(0, 0);
+      window.scrollTo({ top: 0, behavior: 'instant' }); // instant: a page's scroll-behavior: smooth must not animate it
       await document.fonts.ready;
       await raf2();
       // Finish entrance animations; freeze looping ones at their start so both sides match.
@@ -446,13 +449,17 @@ function prInit() {
       await raf2();
     },
 
+    // Scrolls the page once so in-view reveals fire. Each step waits for rendered frames (capped, so a
+    // page that stops rendering can't hang the capture), because a fixed wait alone sometimes saw 0 frames.
     async scrollThrough() {
       const step = Math.max(200, innerHeight * 0.8);
       for (let y = 0, n = 0; y < document.documentElement.scrollHeight && n < 60; y += step, n++) {
-        window.scrollTo(0, y);
+        window.scrollTo({ top: y, behavior: 'instant' });
+        await frames();
         await new Promise((r) => setTimeout(r, 120));
       }
-      window.scrollTo(0, 0);
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      await frames();
       await new Promise((r) => setTimeout(r, 300));
     },
 
@@ -508,6 +515,16 @@ function prInit() {
       let dark = false;
       eachRule((r) => { if (r.media && /prefers-color-scheme\s*:\s*dark/i.test(r.media.mediaText)) dark = true; });
       return dark;
+    },
+
+    // Font families the page declares (@font-face, Google Fonts links) and those that actually loaded.
+    fontSets() {
+      const declared = new Set([...document.fonts].map((f) => fam(f.family)));
+      for (const l of document.querySelectorAll('link[href*="fonts.googleapis.com"]')) {
+        for (const m of l.href.matchAll(/family=([^&:]+)/g)) declared.add(decodeURIComponent(m[1]).replace(/\+/g, ' ').toLowerCase());
+      }
+      const loaded = [...document.fonts].filter((f) => f.status === 'loaded').map((f) => fam(f.family));
+      return { declared: [...declared], loaded };
     },
 
     // Buttons, tabs and toggles that change what is shown - candidates for --click.
@@ -586,10 +603,13 @@ function prInit() {
       return [...byId].filter(([, el]) => found.has(el) && visible(el)).map(([id]) => id);
     },
 
-    hoverPoint(id) {
+    // Async: after scrolling the element into view, wait for rendered frames before hit-testing it,
+    // or the hover can be skipped (or land on a stale position) on a page that is still settling.
+    async hoverPoint(id) {
       const el = byId.get(id);
       if (!el || !visible(el)) return null;
-      el.scrollIntoView({ block: 'center', inline: 'center' });
+      el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+      await frames();
       const r = el.getBoundingClientRect();
       const x = r.left + Math.min(r.width / 2, 20);
       const y = r.top + r.height / 2;
@@ -692,7 +712,7 @@ function refMap(result) {
   const lines = [
     '# Reference map', '',
     `Source: ${path.basename(target)} · captured ${result.capturedAt.slice(0, 16).replace('T', ' ')}`,
-    `Screen sizes: ${variants.map((v) => v.replace('-dark', ' dark')).join(', ')}`,
+    `Screen sizes: ${variants.map((v) => v.replace('-dark', ' dark')).join(', ')}${result.lightOnly ? ' (light only: dark is not measured)' : ''}`,
     `${Object.keys(elements).length} elements in ${sections.length} sections. Give each built element its id as data-ref="r-###".`,
     'Marks: (hover) = has a hover state, (motion) = animates, (hidden) = not visible at any measured size.',
     `State: ${result.clicks.length ? `after clicking ${result.clicks.map((c) => `"${c}"`).join(' → ')}` : 'as the page loads (no clicks)'}`,
@@ -786,8 +806,10 @@ async function main() {
     }
     const motion = await page.evaluate(() => window.__pr.motion());
     const tokenNames = ref ? ref.tokenNames : Object.keys(await page.evaluate(() => window.__pr.tokens()));
+    // --light-only (ref mode): the app has no dark mode, so the artifact's dark theme is not measured or scored.
+    const lightOnly = ref ? Boolean(ref.lightOnly) : flag('light-only') === true;
     const variants = ref ? ref.variants
-      : [...widths.map(String), ...(await page.evaluate(() => window.__pr.hasDark()) ? [`${widths[0]}-dark`] : [])];
+      : [...widths.map(String), ...(!lightOnly && await page.evaluate(() => window.__pr.hasDark()) ? [`${widths[0]}-dark`] : [])];
 
     const measure = {};
     const tokens = {};
@@ -822,9 +844,16 @@ async function main() {
       else { const d = diffSnap(before, after); if (Object.keys(d).length) hover[id] = d; }
     }
 
+    // Fonts used by visible elements that the page declares but never loaded: the page shows a fallback font.
+    const fonts = await page.evaluate(() => window.__pr.fontSets());
+    const loadedFonts = new Set(fonts.loaded);
+    const declaredFonts = new Set(fonts.declared);
+    const fontsMissing = [...new Set(Object.values(measure[variants[0]]).filter((m) => m.visible && m.s && m.s.text).map((m) => m.s.fontFamily))]
+      .filter((f) => declaredFonts.has(f) && !loadedFonts.has(f));
+
     const result = {
       version: 1, mode, target, capturedAt: new Date().toISOString(), dataDir: path.resolve(data),
-      widths, variants, clicks, ...info, tokenNames, tokens, measure, motion, hover, errors: errors.slice(0, 10),
+      widths, variants, lightOnly, fontsMissing, clicks, ...info, tokenNames, tokens, measure, motion, hover, errors: errors.slice(0, 10),
       stateControls: await page.evaluate(() => window.__pr.stateControls()),
       ...(ref
         ? { stateCheck: await page.evaluate((r) => window.__pr.stateCheck(r), ref.stateRules || {}) }
@@ -842,6 +871,7 @@ async function main() {
       console.log(`✔ captured build: ${found} of ${Object.keys(ref.elements).length} reference ids tagged, ${sizes}${dup ? ` · ${dup} ids used more than once` : ''}`);
     }
     if (errors.length) console.log(`⚠ page errors: ${errors.slice(0, 2).join(' | ')}`);
+    if (fontsMissing.length) console.log(`⚠ fonts not loaded: ${fontsMissing.join(', ')} (the page shows a fallback font)`);
   } finally {
     await browser.close();
   }

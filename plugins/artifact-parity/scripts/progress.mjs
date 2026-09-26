@@ -6,7 +6,8 @@
 // bar) and appends a timestamped line to <project>/design-ref/progress.md.
 //
 // Usage (run from the project root, or pass --project <dir>):
-//   progress.mjs preflight --plugin-root <dir> [--data <dir>] [--screen <name>] [--source <link>]
+//   progress.mjs preflight --plugin-root <dir> [--data <dir>] [--screen <name>] [--source <link>] [--run build|design]
+//                      (--run picks the stage list; build, the default, has 9 stages and design has 6)
 //   progress.mjs start <stage> [--note <text>]
 //   progress.mjs sub   <stage> --note <text>          (detail while a stage runs)
 //   progress.mjs done  <stage> [--note <text>] [--score <text>]
@@ -23,14 +24,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const STAGES = [
-  'Preflight', 'Get source', 'Analyze', 'Your answers', 'Set up',
-  'Pass 1 build', 'Pass 2 fix', 'Pass 3 fix', 'Finish',
-];
-const TOTAL = STAGES.length;
+// A run is a build (the default) or a design; each has its own fixed stages.
+const RUNS = {
+  build: ['Preflight', 'Get source', 'Analyze', 'Your answers', 'Set up', 'Pass 1 build', 'Pass 2 fix', 'Pass 3 fix', 'Finish'],
+  design: ['Preflight', 'Read project', 'Your answers', 'Direction and draft', 'Check', 'Publish'],
+};
 const REQUIRED_SCRIPTS = [
   'setup.mjs', 'fetch-public.mjs', 'check-source.mjs', 'detect-project.mjs', 'scope-guard.mjs', 'capture.mjs', 'compare.mjs',
-  'list-skills.mjs', 'progress.mjs', 'statusline.mjs',
+  'list-skills.mjs', 'progress.mjs', 'statusline.mjs', 'skills-offer.mjs', 'wrap-page.mjs',
 ];
 const ASCII = process.env.PARITY_ASCII === '1';
 const G = ASCII
@@ -93,12 +94,13 @@ function appendLog(text) {
 }
 
 function newState(extra = {}) {
+  const kind = RUNS[extra.kind] ? extra.kind : 'build';
   const stages = {};
-  STAGES.forEach((name, i) => { stages[i + 1] = { name, status: 'pending' }; });
+  RUNS[kind].forEach((name, i) => { stages[i + 1] = { name, status: 'pending' }; });
   return {
-    version: 1, total: TOTAL, runId: nowIso(), startedAt: nowIso(),
+    version: 1, kind, total: RUNS[kind].length, runId: nowIso(), startedAt: nowIso(),
     screen: extra.screen || '', source: extra.source || '',
-    current: 1, currentName: STAGES[0], sub: '', score: '',
+    current: 1, currentName: RUNS[kind][0], sub: '', score: '',
     finished: false, failed: false, waiting: '', lastLine: '', stages,
   };
 }
@@ -111,13 +113,19 @@ function startRun(extra) {
   return state;
 }
 
-function stageNumber(raw) {
+// A state file written before run kinds existed is a build.
+const kindOf = (state) => (RUNS[state.kind] ? state.kind : 'build');
+const totalOf = (state) => RUNS[kindOf(state)].length;
+const nameOf = (state, n) => RUNS[kindOf(state)][n - 1];
+
+function stageNumber(raw, state) {
   const n = Number(raw);
-  if (!Number.isInteger(n) || n < 1 || n > TOTAL) usage(`stage must be a number from 1 to ${TOTAL}, got "${raw ?? ''}"`);
+  const total = totalOf(state);
+  if (!Number.isInteger(n) || n < 1 || n > total) usage(`stage must be a number from 1 to ${total}, got "${raw ?? ''}"`);
   return n;
 }
 
-function label(n) { return `${G.bar} [${n}/${TOTAL}] ${STAGES[n - 1]}`; }
+function label(state, n) { return `${G.bar} [${n}/${totalOf(state)}] ${nameOf(state, n)}`; }
 
 function emit(state, line) {
   state.lastLine = line;
@@ -139,12 +147,16 @@ function ensureState() {
 
 function markStart(state, n, note) {
   state.waiting = '';
+  // A stage started again (a design's feedback round) re-opens a finished or stopped run as a new round.
+  if (state.finished) { state.startedAt = nowIso(); state.score = ''; }
+  state.finished = false;
+  state.failed = false;
   const st = state.stages[n];
   st.status = 'running';
   st.startedAt = nowIso();
   delete st.endedAt;
   state.current = n;
-  state.currentName = STAGES[n - 1];
+  state.currentName = nameOf(state, n);
   state.sub = '';
   if (typeof note === 'string') st.note = note;
 }
@@ -153,9 +165,11 @@ function markStart(state, n, note) {
 function cmdPreflight() {
   const root = flags['plugin-root'];
   if (typeof root !== 'string') usage('preflight needs --plugin-root');
+  if (flags.run !== undefined && !RUNS[flags.run]) usage(`--run must be ${Object.keys(RUNS).join(' or ')}`);
   const state = startRun({
     screen: typeof flags.screen === 'string' ? flags.screen : '',
     source: typeof flags.source === 'string' ? flags.source : '',
+    kind: flags.run,
   });
   markStart(state, 1);
   const missing = REQUIRED_SCRIPTS.filter((f) => !fs.existsSync(path.join(root, 'scripts', f)));
@@ -185,34 +199,34 @@ function cmdPreflight() {
     const why = notYetBuilt
       ? details(`not in this plugin version yet: ${missing.join(', ')}`, 'nothing to fix on your side')
       : details(`missing ${missing.join(', ')}`, 'plugin files damaged: reinstall the plugin');
-    emit(state, `${label(1)} ${G.fail}${why}`);
+    emit(state, `${label(state, 1)} ${G.fail}${why}`);
     process.exit(1);
   }
   st.status = 'done';
-  emit(state, `${label(1)} ${G.ok} ${dur}${details('scripts ok')}`.replace(/\s+$/, ''));
+  emit(state, `${label(state, 1)} ${G.ok} ${dur}${details('scripts ok')}`.replace(/\s+$/, ''));
 }
 
 function cmdStart() {
-  const n = stageNumber(positional[1]);
   const state = ensureState();
+  const n = stageNumber(positional[1], state);
   const note = typeof flags.note === 'string' ? flags.note : undefined;
   markStart(state, n, note);
-  emit(state, `${label(n)} ${G.run}${note ? ` ${note}` : ''}`);
+  emit(state, `${label(state, n)} ${G.run}${note ? ` ${note}` : ''}`);
 }
 
 function cmdSub() {
-  const n = stageNumber(positional[1]);
   const note = typeof flags.note === 'string' ? flags.note : '';
   if (!note) usage('sub needs --note');
   const state = ensureState();
+  const n = stageNumber(positional[1], state);
   if (state.stages[n].status !== 'running') markStart(state, n);
   state.sub = note;
-  emit(state, `${label(n)} ${G.run} ${note}`);
+  emit(state, `${label(state, n)} ${G.run} ${note}`);
 }
 
 // The stage line's score and row count, straight from compare's result.json. The caller's
 // --note can only add a reason after them; it can never replace the numbers.
-function fromReport(dir, n, extra) {
+function fromReport(dir, n, extra, kind) {
   const base = path.resolve(projectDir, dir);
   let r;
   try { r = JSON.parse(fs.readFileSync(path.join(base, 'result.json'), 'utf8')); } catch { usage(`--from-report: no result.json in ${dir} - run compare first`); }
@@ -220,60 +234,64 @@ function fromReport(dir, n, extra) {
   let build = null;
   try { build = JSON.parse(fs.readFileSync(path.join(base, 'build.json'), 'utf8')).capturedAt; } catch { /* no build yet */ }
   if (build && r.buildCapturedAt && build !== r.buildCapturedAt) flagsOut.push('stale: compare ran before the latest build capture');
-  const expectedPass = n >= 6 && n <= 9 ? n - 5 : null;
+  const expectedPass = kind === 'build' && n >= 6 && n <= 9 ? n - 5 : null;
   if (expectedPass && r.pass !== expectedPass) flagsOut.push(`from the pass ${r.pass} report`);
   if (/\d+\s*(rows?|differences?)\b|\d+\s*%|clean/i.test(extra)) usage('with --from-report, --note may give a reason but no row counts, percentages or "clean" - those come from result.json');
-  const rows = r.clean ? '' : `${r.rows} row${r.rows === 1 ? '' : 's'} ${n === 6 ? 'to fix' : 'left'}`;
+  // A design's check compares two captures of the same page: rows there are parts that change on their own.
+  const plural = r.rows === 1 ? '' : 's';
+  const rows = r.clean ? (kind === 'design' ? 'two captures match' : '')
+    : kind === 'design' ? `${r.rows} row${plural} differ between two captures` : `${r.rows} row${plural} ${n === 6 ? 'to fix' : 'left'}`;
   const state = r.stateRows ? `${r.stateRows} need an app state` : '';
   return { score: r.score, note: [rows, state, ...flagsOut, extra].filter(Boolean).join(` ${G.dot} `) };
 }
 
 function cmdEnd(kind) {
-  const n = stageNumber(positional[1]);
   const state = ensureState();
+  const n = stageNumber(positional[1], state);
+  const total = totalOf(state);
   const st = state.stages[n];
   let note = typeof flags.note === 'string' ? flags.note : '';
   let score = typeof flags.score === 'string' ? flags.score : '';
-  if (kind === 'done' && typeof flags['from-report'] === 'string') ({ score, note } = fromReport(flags['from-report'], n, note));
+  if (kind === 'done' && typeof flags['from-report'] === 'string') ({ score, note } = fromReport(flags['from-report'], n, note, kindOf(state)));
   if (kind === 'fail' && !note) usage('fail needs --note explaining why');
   state.waiting = '';
   st.endedAt = nowIso();
   if (note) st.note = note;
   const dur = st.startedAt ? fmtDuration(Date.parse(st.endedAt) - Date.parse(st.startedAt)) : '';
   state.current = n;
-  state.currentName = STAGES[n - 1];
+  state.currentName = nameOf(state, n);
   state.sub = '';
   let line;
   if (kind === 'done') {
     st.status = 'done';
     if (score) { st.score = score; state.score = score; }
-    const extra = n === TOTAL ? `total ${fmtDuration(Date.now() - Date.parse(state.startedAt))}` : '';
-    if (n === TOTAL) state.finished = true;
-    line = `${label(n)} ${G.ok}${dur ? ` ${dur}` : ''}${details(score, note, extra)}`;
+    const extra = n === total ? `total ${fmtDuration(Date.now() - Date.parse(state.startedAt))}` : '';
+    if (n === total) state.finished = true;
+    line = `${label(state, n)} ${G.ok}${dur ? ` ${dur}` : ''}${details(score, note, extra)}`;
   } else if (kind === 'skip') {
     st.status = 'skipped';
-    line = `${label(n)} ${G.skip}${details(note)}`;
+    line = `${label(state, n)} ${G.skip}${details(note)}`;
   } else {
     st.status = 'failed';
     state.failed = true;
-    line = `${label(n)} ${G.fail}${details(note)}`;
+    line = `${label(state, n)} ${G.fail}${details(note)}`;
   }
   emit(state, line);
 }
 
 function cmdWait() {
-  const n = stageNumber(positional[1]);
   const note = typeof flags.note === 'string' ? flags.note : '';
   if (!note) usage('wait needs --note with what the user is asked');
   const state = ensureState();
+  const n = stageNumber(positional[1], state);
   const st = state.stages[n];
   st.status = 'waiting';
   st.note = note;
   state.current = n;
-  state.currentName = STAGES[n - 1];
+  state.currentName = nameOf(state, n);
   state.sub = '';
   state.waiting = note;
-  emit(state, `${label(n)} ${G.wait}${details(note)}`);
+  emit(state, `${label(state, n)} ${G.wait}${details(note)}`);
 }
 
 function cmdSet() {
@@ -290,13 +308,14 @@ function cmdSet() {
 function cmdShow() {
   const state = readState();
   if (!state) { console.log('No artifact-parity run found in this project.'); return; }
+  const total = totalOf(state);
   const doneCount = Object.values(state.stages).filter((s) => s.status === 'done' || s.status === 'skipped').length;
-  console.log(`Run ${state.runId} ${G.dot} ${state.screen || 'screen pending'} ${G.dot} ${Math.round((doneCount / TOTAL) * 100)}%`);
-  for (let n = 1; n <= TOTAL; n++) {
+  console.log(`Run ${state.runId} ${G.dot} ${state.screen || 'screen pending'} ${G.dot} ${Math.round((doneCount / total) * 100)}%`);
+  for (let n = 1; n <= total; n++) {
     const s = state.stages[n];
     const mark = { done: G.ok, skipped: G.skip, failed: G.fail, running: G.run, waiting: G.wait, pending: ' ' }[s.status] || s.status;
     const extra = details(s.score, s.note);
-    console.log(`  [${n}/${TOTAL}] ${s.name} ${mark}${extra}`);
+    console.log(`  [${n}/${total}] ${s.name} ${mark}${extra}`);
   }
   if (state.sub) console.log(`  now: ${state.sub}`);
 }

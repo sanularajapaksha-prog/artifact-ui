@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "cli": "skills@1.7.0",
+  "design": [
+    { "name": "design-taste-frontend", "repo": "leonxlnx/taste-skill", "group": "taste", "for": "Picks a design direction that does not look templated: layout, type and color." },
+    { "name": "high-end-visual-design", "repo": "leonxlnx/taste-skill", "group": "taste", "for": "Premium visual polish: fonts, spacing, shadows and card structure." },
+    { "name": "redesign-existing-projects", "repo": "leonxlnx/taste-skill", "group": "taste", "for": "Redesigns a part you already have without breaking what it does." },
+    { "name": "frontend-design", "repo": "anthropics/skills", "group": "taste", "for": "Anthropic's guide to distinctive, intentional frontend design; a second direction to choose from." },
+    { "name": "impeccable", "repo": "pbakaus/impeccable", "group": "polish", "for": "Design critique and polish: hierarchy, spacing, typography, accessibility." },
+    { "name": "emil-design-eng", "repo": "emilkowalski/skills", "group": "polish", "for": "The small UI details and component polish that make an interface feel right." },
+    { "name": "animate", "repo": "emilkowalski/skills", "group": "polish", "for": "Motion decisions in order: whether to animate, easing, duration, interruption." },
+    { "name": "web-design-guidelines", "repo": "vercel-labs/agent-skills", "group": "tools", "for": "Reviews UI against web interface and accessibility guidelines." },
+    { "name": "find-skills", "repo": "vercel-labs/skills", "group": "tools", "for": "Finds a skill on skills.sh when a requirement needs one you don't have." }
+  ],
+  "groups": {
+    "taste": "Design direction",
+    "polish": "Polish and motion",
+    "tools": "Review and finding skills"
+  },
+  "parts": {
+    "direction": ["design-taste-frontend", "high-end-visual-design", "frontend-design"],
+    "redesign": ["redesign-existing-projects"],
+    "motion": ["animate", "emil-design-eng"],
+    "critique": ["impeccable", "web-design-guidelines"],
+    "find": ["find-skills"]
+  },
+  "optional": [
+    { "name": "ponytail", "id": "ponytail@ponytail", "marketplace": "DietrichGebert/ponytail", "for": "Keeps code minimal: reuse before writing, no speculative code.", "changes": "Turns itself on in every session and changes how Claude writes code in all your projects." },
+    { "name": "caveman", "id": "caveman@caveman", "marketplace": "JuliusBrussee/caveman", "for": "Short, token-saving replies.", "changes": "Turns itself on in every session and changes how Claude talks in all your projects." },
+    { "name": "specclaw", "id": "specclaw@chan4lk", "marketplace": "chan4lk/specclaw", "for": "A spec-driven workflow: propose, plan, build, verify.", "changes": "Adds its own commands and agents; newer versions also start with every session." }
+  ]
+}

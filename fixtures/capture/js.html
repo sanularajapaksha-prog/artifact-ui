@@ -1,0 +1,40 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JS motion probe</title>
+<script>if(new URLSearchParams(location.search).get('v')==='b')document.documentElement.classList.add('vb');</script>
+<style>
+body{margin:0;font-family:system-ui,sans-serif}
+section{padding:24px;min-height:100px;border-bottom:1px solid #ddd}
+.box{width:60px;height:60px;background:#16a34a;border-radius:8px}
+.spacer{height:1800px}
+.io{opacity:0;transform:translateY(40px);transition:opacity .6s ease,transform .6s ease}
+.io.in{opacity:1;transform:none}
+.vb .io{transition-duration:.3s}
+@keyframes pop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+.io-anim{opacity:0}
+.io-anim.in{animation:pop .5s ease-out both}
+.vb .io-anim.in{animation-duration:.9s}
+</style></head><body>
+<section id="s-wloop"><h2>WAAPI loop</h2><div id="wloop" class="box"></div></section>
+<section id="s-win"><h2>WAAPI entrance</h2><div id="win" class="box"></div></section>
+<section id="s-wrep"><h2>WAAPI re-created by timer</h2><div id="wrep" class="box"></div></section>
+<section id="s-count"><h2>rAF count-up</h2><p id="count">0</p></section>
+<section id="s-raf"><h2>rAF inline loop</h2><div id="rafloop" class="box"></div></section>
+<div class="spacer"></div>
+<section id="s-io1"><h2>IO once</h2><div id="io1" class="box io"></div></section>
+<section id="s-io2"><h2>IO toggle</h2><div id="io2" class="box io"></div></section>
+<section id="s-io3"><h2>IO animation</h2><div id="io3" class="box io-anim"></div></section>
+<div class="spacer"></div>
+<script>
+const $=(id)=>document.getElementById(id);
+const vb=document.documentElement.classList.contains('vb');
+$('wloop').animate([{transform:'rotate(0deg)'},{transform:'rotate(360deg)'}],{duration:vb?3000:2000,iterations:Infinity});
+$('win').animate([{opacity:0,transform:'translateY(20px)'},{opacity:1,transform:'none'}],{duration:800,easing:vb?'ease-in':'ease-out',fill:'both'});
+setInterval(()=>$('wrep').animate([{transform:'scale(1)'},{transform:'scale(1.2)'},{transform:'scale(1)'}],{duration:400}),700);
+const t0=performance.now();
+(function tick(){const p=Math.min(1,(performance.now()-t0)/(vb?4000:3000));$('count').textContent=Math.round(p*1000).toLocaleString('en-US');if(p<1)requestAnimationFrame(tick);})();
+(function spin(){$('rafloop').style.transform=`rotate(${(performance.now()/(vb?30:20))%360}deg)`;requestAnimationFrame(spin);})();
+const once=new IntersectionObserver((es)=>es.forEach((e)=>{if(e.isIntersecting){e.target.classList.add('in');once.unobserve(e.target);}}),{threshold:.2});
+once.observe($('io1'));once.observe($('io3'));
+new IntersectionObserver((es)=>es.forEach((e)=>e.target.classList.toggle('in',e.isIntersecting)),{threshold:.2}).observe($('io2'));
+</script>
+</body></html>

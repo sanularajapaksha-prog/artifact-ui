@@ -8,7 +8,7 @@
     {
       "name": "artifact-parity",
       "source": "./plugins/artifact-parity",
-      "description": "Rebuild a claude.ai artifact in your codebase with measured visual and motion parity"
+      "description": "Design UI as a claude.ai artifact from plain words, then rebuild any artifact in your codebase with measured visual and motion parity"
     }
   ]
 }

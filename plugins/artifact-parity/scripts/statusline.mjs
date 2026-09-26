@@ -62,19 +62,20 @@ function render() {
   if (!ended && age > ABANDONED_MS) return '';
 
   const total = s.total || Object.keys(s.stages).length;
+  const word = s.kind === 'design' ? 'design' : 'parity'; // runs written before run kinds are builds
   const screen = s.screen || 'screen pending';
   const elapsed = fmtDuration((ended ? updated : now) - Date.parse(s.startedAt));
   const parts = [];
   if (s.finished) {
-    parts.push(`${G.ok} parity`, screen, 'done');
+    parts.push(`${G.ok} ${word}`, screen, 'done');
     if (s.score) parts.push(s.score);
   } else if (s.failed) {
-    parts.push(`${G.fail} parity`, screen, `stopped at ${s.current}/${total} ${s.currentName || ''}`.trim());
+    parts.push(`${G.fail} ${word}`, screen, `stopped at ${s.current}/${total} ${s.currentName || ''}`.trim());
   } else if (s.waiting) {
-    parts.push(`${G.wait} parity`, screen, `${s.current}/${total} ${s.currentName || ''}`.trim(), 'waiting for you');
+    parts.push(`${G.wait} ${word}`, screen, `${s.current}/${total} ${s.currentName || ''}`.trim(), 'waiting for you');
   } else {
     const justDone = s.stages?.[s.current]?.status === 'done' ? ` ${G.ok}` : '';
-    parts.push(`${G.run} parity`, screen, `${s.current}/${total} ${s.currentName || ''}${justDone}`.trim());
+    parts.push(`${G.run} ${word}`, screen, `${s.current}/${total} ${s.currentName || ''}${justDone}`.trim());
     if (s.sub) parts.push(s.sub);
     if (s.score) parts.push(s.score);
   }
