@@ -1,0 +1,14 @@
+{
+  "name": "artifact-tools",
+  "description": "Sanula's Claude Code plugins for turning claude.ai artifacts into production UI",
+  "owner": {
+    "name": "Sanula"
+  },
+  "plugins": [
+    {
+      "name": "artifact-parity",
+      "source": "./plugins/artifact-parity",
+      "description": "Rebuild a claude.ai artifact in your codebase with measured visual and motion parity"
+    }
+  ]
+}
