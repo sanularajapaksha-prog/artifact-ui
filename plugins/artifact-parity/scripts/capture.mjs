@@ -6,9 +6,13 @@
 // Usage:
 //   capture.mjs --data <dir> --mode ref   --target <artifact file or URL> --out <dir> [--widths 1440,768,390]
 //   capture.mjs --data <dir> --mode build --target <preview URL>          --out <dir>
+//   capture.mjs --data <dir> --mode probe --target <URL>   prints "open" or "login needed"
+//   capture.mjs --data <dir> --mode login --target <URL>   opens a browser window; the user logs in
 // ref   writes ref.json, ref-map.md and ref-<size>.png
 // build writes build.json and build-<size>.png, reusing the sizes, hover
 //       targets and token names recorded in ref.json (so ref must run first).
+// login saves the session (cookies, local/session storage, IndexedDB - never a
+//       password) to <data>/auth/<host>.json; every later capture of that site uses it.
 // .jsx/.tsx artifacts are rendered through a small React harness (CDN).
 // Exit codes: 0 captured, 1 failed (reason printed), 2 usage error.
 
@@ -28,8 +32,9 @@ const data = flag('data');
 const mode = flag('mode');
 const target = flag('target');
 const out = flag('out');
-if (typeof data !== 'string' || !['ref', 'build'].includes(mode) || typeof target !== 'string' || typeof out !== 'string') {
-  console.error('capture: --data, --mode ref|build, --target and --out are required');
+const pageMode = mode === 'ref' || mode === 'build';
+if (typeof data !== 'string' || !['ref', 'build', 'probe', 'login'].includes(mode) || typeof target !== 'string' || (pageMode && typeof out !== 'string')) {
+  console.error('capture: --data, --mode ref|build|probe|login and --target are required (--out for ref and build)');
   process.exit(2);
 }
 const timeoutMs = (Number(flag('timeout')) || 60) * 1000;
@@ -38,7 +43,84 @@ const MAX_HOVERS = 80;
 
 class CaptureError extends Error {}
 const fail = (msg) => { throw new CaptureError(msg); };
-const outDir = path.resolve(out);
+const outDir = path.resolve(typeof out === 'string' ? out : '.');
+
+// ---------- saved login sessions ----------
+const authFile = (url) => {
+  try {
+    const u = new URL(url);
+    if (!/^https?:$/.test(u.protocol)) return null;
+    return path.join(path.resolve(data), 'auth', `${u.host.replace(/[^\w.-]/g, '_')}.json`);
+  } catch { return null; }
+};
+async function newContext(browser, url, options) {
+  const file = authFile(url);
+  const saved = file && fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null;
+  const context = await browser.newContext({ ...options, ...(saved ? { storageState: saved.state } : {}) });
+  // Playwright's storage state has no sessionStorage; restore it before the app's scripts run.
+  if (saved?.session) {
+    await context.addInitScript((s) => {
+      const items = s[location.origin];
+      if (items && !sessionStorage.getItem('__pr_restored')) {
+        for (const [k, v] of Object.entries(items)) sessionStorage.setItem(k, v);
+        sessionStorage.setItem('__pr_restored', '1');
+      }
+    }, saved.session);
+  }
+  return context;
+}
+const LOGIN_URL = /\/(login|log-in|signin|sign-in|sign_in|auth|oauth2?|sso|authorize)(\/|\?|$)|login\.microsoftonline\.com|accounts\.google\.com|\.auth0\.com|\.okta\.com|clerk\./i;
+async function looksLikeLogin(page) {
+  if (LOGIN_URL.test(page.url())) return true;
+  return page.evaluate(() => [...document.querySelectorAll('input[type=password]')].some((i) => i.offsetParent !== null)).catch(() => false);
+}
+
+async function probe() {
+  const browser = await launchBrowser(data);
+  try {
+    const page = await (await newContext(browser, target, { viewport: { width: 1440, height: HEIGHT } })).newPage();
+    try { await page.goto(target, { waitUntil: 'load', timeout: timeoutMs }); } catch (e) { fail(`the page did not load (${e.message.split('\n')[0]})`); }
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(1500);
+    console.log(await looksLikeLogin(page) ? `login needed (landed on ${page.url()})` : 'open');
+  } finally { await browser.close(); }
+}
+
+async function login() {
+  const file = authFile(target);
+  if (!file) fail('login needs an http(s) URL');
+  const browser = await launchBrowser(data, { headless: false });
+  try {
+    const context = await browser.newContext({ viewport: null });
+    const page = await context.newPage();
+    await page.goto(target, { waitUntil: 'domcontentloaded', timeout: timeoutMs }).catch(() => {});
+    console.log('Log in in the browser window that just opened. It closes by itself once you are in.');
+    const origin = new URL(target).origin;
+    const started = Date.now();
+    const deadline = started + 10 * 60 * 1000;
+    let okCount = 0;
+    let sawLogin = false;
+    while (Date.now() < deadline) {
+      if (page.isClosed()) fail('the login window was closed before the login finished');
+      await page.waitForTimeout(1000);
+      const onSite = (() => { try { return new URL(page.url()).origin === origin; } catch { return false; } })();
+      const atLogin = await looksLikeLogin(page);
+      sawLogin ||= atLogin;
+      okCount = onSite && !atLogin ? okCount + 1 : 0;
+      // Save only after a login page was seen (so a slow redirect to it isn't mistaken for "logged in"),
+      // or after 20s on the site with no login page at all (already logged in).
+      if (okCount >= 3 && (sawLogin || Date.now() - started > 20000)) {
+        const state = await context.storageState({ indexedDB: true });
+        const session = { [origin]: await page.evaluate(() => Object.fromEntries(Object.entries(sessionStorage))) };
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, JSON.stringify({ savedAt: new Date().toISOString(), state, session }));
+        console.log(`✔ login saved for ${new URL(target).host} - later captures of this site use it`);
+        return;
+      }
+    }
+    fail('no login within 10 minutes');
+  } finally { await browser.close().catch(() => {}); }
+}
 
 // ---------- everything below prInit runs inside the page ----------
 function prInit() {
@@ -195,7 +277,8 @@ function prInit() {
         s.w = r.width;
         s.h = r.height;
         if (el.tagName.toLowerCase() === 'svg') { s.fill = nc(cs.fill); s.stroke = nc(cs.stroke); s.icon = iconSig(el); }
-        res[id] = { visible: true, s, r: { x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: r.height } };
+        // t = fingerprint of all text inside, so compare --live-data can tell data-driven elements apart.
+        res[id] = { visible: true, s, r: { x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: r.height, t: hash(el.textContent.replace(/\s+/g, ' ').trim()) } };
       }
       return res;
     },
@@ -383,7 +466,7 @@ async function main() {
 
   const browser = await launchBrowser(data);
   try {
-    const context = await browser.newContext({ viewport: { width: widths[0], height: HEIGHT }, deviceScaleFactor: 1, colorScheme: 'light' });
+    const context = await newContext(browser, url, { viewport: { width: widths[0], height: HEIGHT }, deviceScaleFactor: 1, colorScheme: 'light' });
     await context.addInitScript(prInit);
     const page = await context.newPage();
     const errors = [];
@@ -398,6 +481,9 @@ async function main() {
       await page.waitForFunction(() => window.__prReady || window.__prError, null, { timeout: 30000 }).catch(() => {});
       const err = await page.evaluate(() => window.__prError);
       if (err) fail(`the React artifact did not render (${err})`);
+    }
+    if (mode === 'build' && await looksLikeLogin(page)) {
+      fail(`the page shows a login instead of the app (${page.url()}) - run capture --mode login --target "${target}" once`);
     }
     await page.evaluate(() => window.__pr.scrollThrough());
 
@@ -465,7 +551,7 @@ async function main() {
   }
 }
 
-main().catch((e) => {
+({ probe, login }[mode] || main)().catch((e) => {
   console.log(`✖ capture failed: ${e instanceof CaptureError ? e.message : e.message.split('\n')[0]}`);
   process.exitCode = 1;
 });

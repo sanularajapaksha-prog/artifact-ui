@@ -4,8 +4,10 @@
 // and tokens -> typography -> box -> layout -> states -> motion. Prints the
 // score. From pass 3 on it also writes reference | build | diff crops.
 //
-// Usage: compare.mjs --dir <design-ref/screen> [--scope <scope.json>] [--pass <n>] [--data <plugin data dir>]
+// Usage: compare.mjs --dir <design-ref/screen> [--scope <scope.json>] [--pass <n>] [--live-data] [--data <plugin data dir>]
 // Colors must match exactly; px values within 0.5px.
+// --live-data: for a page showing real data (enhance mode), skip text and size of elements whose
+// content differs from the artifact's sample, and x/y in sections whose content differs.
 // Exit codes: 0 compared (clean or not), 1 failed (reason printed), 2 usage error.
 
 import fs from 'node:fs';
@@ -72,6 +74,8 @@ async function main() {
   const rootOf = Object.fromEntries(ref.sections.map((s) => [s.id, s.root]));
   const ids = Object.keys(ref.elements).filter(inScope);
 
+  const liveData = flag('live-data') === true;
+  const liveIds = new Set();
   let checks = 0; let passed = 0;
   const rows = new Map();
   const check = (ok, cat, id, prop, exp, act, size) => {
@@ -98,14 +102,20 @@ async function main() {
       check(present, 'missing', id, 'element', 'present',
         build.elements?.[id] ? 'hidden at this size' : `no element with data-ref="${id}"`, v);
       if (!present) continue;
+      // --live-data: the page shows real data, so an element whose text differs from the
+      // artifact's sample keeps its style checks but skips text and size.
+      const live = liveData && r.r.t !== undefined && r.r.t !== b.r.t;
+      if (live) liveIds.add(id);
       for (const [p, exp] of Object.entries(r.s)) {
         const side = p.match(/^border(Top|Right|Bottom|Left)Color$/);
         if (side && r.s[`border${side[1]}Width`] === '0px') continue;
+        if (live && (p === 'text' || p === 'w' || p === 'h')) continue;
         check(same(p, exp, b.s[p]), catOf(p), id, p, exp, b.s[p] ?? '(none)', v);
       }
       const rootId = rootOf[ref.elements[id].section];
       const r0 = R[rootId]; const b0 = B[rootId];
-      if (id !== rootId && r0?.visible && b0?.visible) {
+      const sectionLive = liveData && r0?.visible && b0?.visible && r0.r.t !== undefined && r0.r.t !== b0.r.t;
+      if (id !== rootId && r0?.visible && b0?.visible && !sectionLive) {
         const [ex, ey] = [r.r.x - r0.r.x, r.r.y - r0.r.y].map((n) => +n.toFixed(2));
         const [ax, ay] = [b.r.x - b0.r.x, b.r.y - b0.r.y].map((n) => +n.toFixed(2));
         check(same('x', ex, ax), 'layout', id, `x in section (from ${rootId})`, ex, ax, v);
@@ -225,6 +235,7 @@ async function main() {
     `Screen sizes: ${ref.variants.map((v) => v.replace('-dark', ' dark')).join(', ')} · hover measured at ${hoverSize}`,
     'Rules: colors exact, px values within 0.5px, x/y measured from the section root.',
   ];
+  if (liveData) lines.push(`Live data: ${liveIds.size} elements show real data instead of the artifact's sample text - their text and size were not checked; their styles were. x/y is skipped in sections whose content differs.`);
   if (extra.length) lines.push(`Note: the build has data-ref ids the artifact doesn't: ${extra.slice(0, 10).join(', ')}${extra.length > 10 ? ' ...' : ''}`);
   if (clean) lines.push('', 'CLEAN - no differences.');
   for (const cat of CATS) {

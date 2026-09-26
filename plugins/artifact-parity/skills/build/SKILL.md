@@ -33,7 +33,7 @@ Arguments: `$ARGUMENTS`
 Keep a short `RUN FACTS` block, at most 15 lines, and send it with every worker call:
 
 - **Start with:** `SOURCE` and `BRIEF`.
-- **After each worker reply:** add or update the facts from its `NOTES`, for example `screen`, `source_file`, `re_check`, `stack`, `preview_url`, `target`, `skills`, `scope_file`, the scores, `clean`, `files`, `left_rows`.
+- **After each worker reply:** add or update the facts from its `NOTES`, for example `screen`, `source_file`, `re_check`, `mode`, `app_dir`, `stack`, `preview_url`, `target_files` or `target`, `docker`, `login`, `leftovers`, `skills`, `scope_file`, the scores, `clean`, `files`, `left_rows`.
 
 ## Stage order
 
@@ -73,8 +73,8 @@ If the worker agent isn't available, tell the user in one line to restart Claude
 After stage 9, print one short block:
 
 ```
-✅ Done: <component / files created or changed>
-Score: <final score> · <"0 differences left" or the left_rows, one per line>
+✅ Done: <enhanced <component> | built new at <place>> · <files created or changed>
+Score: <final score> measured on <measured_on> · <"0 differences left" or the left_rows, one per line>
 ```
 
-Then add "Run one more pass?" only if rows remain. Mention once that the `data-ref` attributes can be stripped from production builds.
+If NOTES list `unwired` or `kept_extra`, add one line each so the user knows what still shows sample content and which existing parts were kept. Then add "Run one more pass?" only if rows remain. Mention once that the `data-ref` attributes can be stripped from production builds.
