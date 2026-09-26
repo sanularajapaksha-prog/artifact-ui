@@ -43,6 +43,8 @@ if (typeof data !== 'string' || !['ref', 'build', 'probe', 'login', 'env-search'
   process.exit(2);
 }
 const timeoutMs = (Number(flag('timeout')) || 60) * 1000;
+// --click can repeat: each one is clicked in order after load, to reach a state (a mode, tab or panel).
+const clicks = argv.flatMap((v, i) => (v === '--click' && argv[i + 1] !== undefined ? [argv[i + 1]] : []));
 const HEIGHT = 900;
 const MAX_HOVERS = 80;
 
@@ -432,6 +434,20 @@ function prInit() {
       return dark;
     },
 
+    // Buttons, tabs and toggles that change what is shown - candidates for --click.
+    stateControls() {
+      const res = [];
+      for (const el of document.querySelectorAll('button, [role=tab], [role=button], [aria-pressed], [aria-selected], [aria-expanded], a[href^="#"]')) {
+        if (!visible(el)) continue;
+        const text = (el.innerText || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim();
+        if (!text || text.length > 32) continue;
+        const on = el.getAttribute('aria-pressed') ?? el.getAttribute('aria-selected') ?? el.getAttribute('aria-expanded');
+        res.push({ text, id: el.getAttribute(attr) || '', selector: el.id ? `#${el.id}` : '', toggle: on !== null, on: on === 'true' });
+      }
+      // Toggles (modes, tabs) first: they are the likely state switches.
+      return res.sort((a, b) => Number(b.toggle) - Number(a.toggle)).slice(0, 25);
+    },
+
     hoverTargets() {
       const found = new Set();
       eachRule((r) => {
@@ -561,7 +577,15 @@ function refMap(result) {
     `Screen sizes: ${variants.map((v) => v.replace('-dark', ' dark')).join(', ')}`,
     `${Object.keys(elements).length} elements in ${sections.length} sections. Give each built element its id as data-ref="r-###".`,
     'Marks: (hover) = has a hover state, (motion) = animates, (hidden) = not visible at any measured size.',
+    `State: ${result.clicks.length ? `after clicking ${result.clicks.map((c) => `"${c}"`).join(' → ')}` : 'as the page loads (no clicks)'}`,
   ];
+  if (result.stateControls?.length) {
+    lines.push('', '## State controls', '',
+      'Buttons, tabs and toggles that change what is shown. If the part you need is not below, capture again with --click "<text>" (repeat for several clicks, in order).', '');
+    for (const c of result.stateControls) {
+      lines.push(`- "${c.text}"${c.selector ? ` (${c.selector})` : ''}${c.toggle ? ` · toggle, ${c.on ? 'on' : 'off'} now` : ''}${c.id ? ` · ${c.id}` : ''}`);
+    }
+  }
   for (const s of sections) {
     const ids = Object.keys(elements).filter((id) => elements[id].section === s.id);
     lines.push('', `## ${s.id} · ${s.name} · ${ids.length} elements${s.hiddenAtLoad ? ' · hidden at load' : ''}`);
@@ -605,6 +629,22 @@ async function main() {
     }
     if (mode === 'build' && await looksLikeLogin(page)) {
       fail(`the page shows a login instead of the app (${page.url()}) - run capture --mode login --target "${target}" once`);
+    }
+    for (const c of clicks) {
+      // A CSS selector (#id, .class, [attr]) or else the visible text of a button, tab or link.
+      const isSelector = /^[#.[]|[=>]/.test(c);
+      const candidates = isSelector ? [page.locator(c)] : [
+        page.getByRole('button', { name: c, exact: true }), page.getByRole('tab', { name: c, exact: true }),
+        page.getByRole('link', { name: c, exact: true }), page.getByText(c, { exact: true }),
+      ];
+      let clicked = false;
+      for (const loc of candidates) {
+        const first = loc.first();
+        if (await first.count() && await first.isVisible().catch(() => false)) { await first.click({ timeout: 5000 }); clicked = true; break; }
+      }
+      if (!clicked) fail(`nothing visible to click for "${c}" - use the exact text of a button or tab, or a CSS selector`);
+      await page.waitForTimeout(700);
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     }
     await page.evaluate(() => window.__pr.scrollThrough());
 
@@ -653,7 +693,8 @@ async function main() {
 
     const result = {
       version: 1, mode, target, capturedAt: new Date().toISOString(), dataDir: path.resolve(data),
-      widths, variants, ...info, tokenNames, tokens, measure, motion, hover, errors: errors.slice(0, 10),
+      widths, variants, clicks, ...info, tokenNames, tokens, measure, motion, hover, errors: errors.slice(0, 10),
+      stateControls: await page.evaluate(() => window.__pr.stateControls()),
     };
     fs.writeFileSync(path.join(outDir, `${mode}.json`), JSON.stringify(result));
     const sizes = `${variants.length} screen size${variants.length > 1 ? 's' : ''}`;

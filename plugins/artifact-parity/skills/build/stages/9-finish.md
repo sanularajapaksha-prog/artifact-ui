@@ -49,7 +49,7 @@ Read `docker` from `design-ref/.parity-project.json`.
   6. Run `progress.mjs sub 9 --note "docker restart <service>"`, then the saved `up` command.
   7. Wait until `<confirmed url><path of preview_url>` answers (poll every 5s, up to 3 minutes). In `new` mode, use the confirmed `target` route, since the preview route is gone.
   8. Probe it for a login (`capture.mjs --mode probe`). If a login is needed, ask with the same four options as stage 3 (login window / env file I give / search env files / paste username and password) for this URL; the Docker host keeps its own session.
-  9. Run `progress.mjs sub 9 --note "measuring the Docker build"`, then capture in `build` mode on that URL and compare with `--scope "design-ref/<screen>/scope.json" --pass 4` (plus `--live-data` in `enhance` mode). This compare is the final score.
+  9. Run `progress.mjs sub 9 --note "measuring the Docker build"`, then capture in `build` mode on that URL (with one `--click` per `build_clicks` entry) and compare with `--scope "design-ref/<screen>/scope.json" --pass 4` (plus `--live-data` in `enhance` mode). This compare is the final score.
 - **If the Docker build or restart fails:**
   1. Keep the last 15 lines of its output, most of all the lines with `error`.
   2. Run `progress.mjs wait 9 --note "docker build failed"` and return STATUS `needs-user`: "The Docker rebuild failed: <main error line>. How should I rebuild the frontend?" Options: `Retry` / `I'll give my rebuild command` / `Skip the Docker check`.

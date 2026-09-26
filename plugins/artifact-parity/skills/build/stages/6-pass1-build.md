@@ -39,7 +39,7 @@ Run `progress.mjs start 6`.
    - Run `progress.mjs sub 6 --note "measuring"`, then (add `--live-data` in `enhance` mode, where the page shows real data instead of the artifact's sample text):
 
 ```
-node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode build --target "<preview_url>" --out "design-ref/<screen>"
+node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode build --target "<preview_url>" --out "design-ref/<screen>" [--click "<each build_click>" ...]
 node "<ROOT>/scripts/compare.mjs" --dir "design-ref/<screen>" --scope "design-ref/<screen>/scope.json" --pass 1 [--live-data]
 ```
 
