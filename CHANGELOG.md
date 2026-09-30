@@ -7,6 +7,13 @@ The reasoning behind the bigger changes is in [docs/DECISIONS.md](docs/DECISIONS
 
 ---
 
+## v0.10.2 — Make the taste skill lead every design
+
+- `design-taste-frontend` is the main skill of every design: it is offered first in the skills question,
+  always kept among the skills used, loaded first, sets the design read and dials, and its pre-flight
+  check runs first in the critique. For dashboards it applies the rules that fit and skips the
+  landing-page-only ones.
+
 ## v0.10.1 — Leave Specclaw out, and show the build command after a design
 
 - Specclaw is no longer one of the optional plugins the skills offer suggests.

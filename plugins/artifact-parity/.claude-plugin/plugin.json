@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "artifact-parity",
   "displayName": "Artifact Parity",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "description": "Design UI as a claude.ai artifact from plain words (it reads your project, gets the skills it needs, checks the page in a real browser and publishes it), then build any artifact into your codebase: give it the link and, in plain words, what to build and where. The build measures fonts, spacing, colors, transparency, theme and motion against the artifact and fixes differences in up to 3 passes. Skills are only used after you confirm them. The chat shows only stage lines, your questions and the result. Includes scout, a recommended-skills offer and an optional live status bar.",
   "author": {
     "name": "Sanula"

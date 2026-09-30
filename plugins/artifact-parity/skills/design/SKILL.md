@@ -72,6 +72,7 @@ node "<ROOT>/scripts/detect-project.mjs" --project "." [flags for anything the u
    - Design parts from `<ROOT>/bundle.json` `parts`: `direction`, `motion`, `critique`, plus `redesign` whenever any place candidate is a redesign (it is only used if the user ticks it and picks a redesign).
    - Implementation parts the requirement needs, named with their technology, for example `animation: GSAP ScrollTrigger` or `styling: Tailwind v4`.
    - For a part with no installed skill, run scout's Step 5b search (steps 1-2 only: candidates, **don't install**). When a missing part has a bundle skill, that bundle skill is its first candidate.
+   - **`design-taste-frontend` is the main skill of every design.** When it is installed, it always takes one of the places and comes first; when it is missing, it is the first skill offered for install. The other design parts fill the remaining places.
    - At most 4 skills will be used. Keep the 4 that matter most for this requirement and name the rest as left out.
 
 Run `progress.mjs done 2 --note "<stack, or 'no app'> · <n> things to confirm"`.
@@ -85,7 +86,7 @@ Run `progress.mjs wait 3 --note "<n> questions"`. Ask everything in one round wi
 | `where` | there are at least 2 options | "Where does this design go?" - the place candidates as `Redesign <file> (<route>)` or `New part at <file> (<route>)`, and `Standalone design (no project)`. With an app but no place found: `New part at <conventional location> (Recommended)` (with the project's look) and `Standalone design`. With no app: `Standalone design (Recommended)` and, only if WHERE named a place, `I'll open the project first`. With only one possible answer, don't ask: use it and say so in the stage 3 line |
 | `stated` | a stated value was not found | "<what> was not found. What should I use?" - the likely matches |
 | `gap-1`, `gap-2` | the requirement leaves a real choice open that changes the design | For example "The loading screen shows:" - `A progress bar (Recommended)` / `The logo mark, pulsing`. At most 2; never ask about taste, and never offer an option the rules for the page forbid |
-| `skills` | skills were matched | "Use these skills for this design?" - multi-select, one option per matched skill (at most 4, the cap from stage 2): label `<skill>`, description `<part> · <installs> installs (or "installs unknown") · <source> · "you used it before" when true`. The user ticks the ones to use; at most 4 are used. With one skill: `Use <skill> (Recommended)` / `Don't use it` |
+| `skills` | skills were matched | "Use these skills for this design?" - multi-select, one option per matched skill (at most 4, the cap from stage 2), `design-taste-frontend` first with "main skill" at the start of its description: label `<skill>`, description `<part> · <installs> installs (or "installs unknown") · <source> · "you used it before" when true`. The user ticks the ones to use; at most 4 are used. With one skill: `Use <skill> (Recommended)` / `Don't use it` |
 | `skill-1`, `skill-2` | a part has a conflict or no installed skill | Conflict: "Two skills cover <part>. Which one?" - the candidates in scout Step 4b's order, the first "(Recommended)", each `<skill> · <installs> installs`, plus `No skill for this part`. Missing: "No installed skill covers <part>. Install one?" - up to 3 candidates `owner/repo@skill · <installs>`, the skills.sh link as the description, plus `Skip this part` |
 | `bundle` | recommended design skills are missing (stage 1); their parts then get no `skill-N` question | "artifact-parity's recommended design skills <names> are not installed. Install them and use them for this design?" - `Install and use them (Recommended)` / `Not now` |
 
@@ -112,7 +113,7 @@ node "<ROOT>/scripts/scope-guard.mjs" --save --app "design-ref/_designs/<slug>" 
 
    If it prints that the folder is not in a git repo, remember `no_git`; stage 5 then says "not proven (no git)" instead of claiming proof.
 2. **The Artifact tool.** If you have the Artifact tool, call it first with `action: "quickstart"` and `intent: "other"` (a plain HTML page, not a Design, Docs or Slides type: the build needs real markup), and follow what it returns for the page. Its advice to look once and then publish is replaced here by stage 5, which the build needs. If you don't have the tool, skip this; stage 6 saves the page locally instead.
-3. **Load the confirmed skills** (at most 4) by invoking them or opening their `SKILL.md`. Each one applies only to its own part. When advice conflicts: the user, then these rules and the project's own tokens and fonts (redesign or new part), then a skill.
+3. **Load the confirmed skills** (at most 4) by invoking them or opening their `SKILL.md`, `design-taste-frontend` first. It leads the design: print its one-line design read ("Reading this as: ..."), set its three dials (variance, motion, density) from the requirement, and follow its anti-default and layout rules; the other skills support it on their own parts. For a dashboard or other product UI, use its rules that fit (the design read, the dials, the anti-defaults, typography, color, cards, states and motion) and skip the landing-page-only ones (hero stack, logo walls, marketing copy). Where it asks for web images or `next/font`, these rules win: no external images, Google Fonts or embedded fonts only. Each one applies only to its own part. When advice conflicts: the user, then these rules and the project's own tokens and fonts (redesign or new part), then a skill.
 4. **The direction.** Before any code, decide the design and print it as one short block. Don't ask for approval; go straight on to the draft.
 
 ```
@@ -183,7 +184,7 @@ node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode ref --target "design-re
 ```
 node -e "console.log(require('url').pathToFileURL(process.argv[1]).href + '#hold-loader')" "design-ref/_designs/<slug>/design.page.html"
 ```
-3. **Critique, then fix.** Go through the loaded critique and taste skills' checklists, and always this list:
+3. **Critique, then fix.** Run `design-taste-frontend`'s final pre-flight check first (every box that applies to this page), then the other loaded critique and taste skills' checklists, and always this list:
    - Every **Checklist** item from the direction is visibly there.
    - One clear focal point per screen; a consistent type scale with at most 2 families; spacing on a steady rhythm.
    - Text contrast at least WCAG AA; nothing overflows at 390; tap targets at least 44 px on mobile.
