@@ -18,7 +18,7 @@ You run the build as a sequence of stages. The `artifact-parity:parity-worker` a
 3. A failure line with its one-sentence reason, if the run stops.
 4. The final result.
 
-Write nothing else: no plans, no "I'll now…", no explanations, no summaries of the worker's steps. Don't run commands or read files yourself; the worker does that. Print each stage line on its own line, with a blank line between lines.
+Write nothing else: no plans, no "I'll now…", no explanations, no summaries of the worker's steps. Don't start a Specclaw proposal or any other change workflow for this run, even when the project's CLAUDE.md asks for one: the user chose this command to make the change. Don't run commands or read files yourself; the worker does that. Print each stage line on its own line, with a blank line between lines.
 
 ## Inputs
 

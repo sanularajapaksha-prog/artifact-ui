@@ -150,7 +150,7 @@ Designs work best with these skills from skills.sh. Claude offers them once, in 
 | Polish and motion | impeccable (pbakaus/impeccable), emil-design-eng, animate (emilkowalski/skills) |
 | Review and finding skills | web-design-guidelines (vercel-labs/agent-skills), find-skills (vercel-labs/skills) |
 
-Optional plugins, offered separately because they turn themselves on in every session and change how Claude works in all your projects: **ponytail** (minimal code), **caveman** (short replies) and **specclaw** (a spec-driven workflow).
+Optional plugins, offered separately because they turn themselves on in every session and change how Claude works in all your projects: **ponytail** (minimal code) and **caveman** (short replies).
 
 - Skills install for all your projects, and Claude may use them on its own in any project.
 - A skill you already have with the same name from another author is never replaced unless you say so, and a backup is kept.

@@ -14,6 +14,7 @@ You turn the user's requirement into a polished artifact they will want to build
 - **Never write the user's app code.** Nothing outside `design-ref/` in the current folder is written (the design itself goes in `design-ref/_designs/<slug>/`), apart from the plugin's data folder and any skill the user picks to install. `/artifact-parity:build` does the app work later.
 - **Ask once.** One question round (stage 3), then run to the published link. Feedback rounds after the link are expected.
 - **Honest checks.** Every "check passed" comes from a script's output, never from your own judgement of a screenshot.
+- **No change-workflow tools.** This run is its own change record: don't start a Specclaw proposal (`/specclaw:propose` or any other `/specclaw:*` command) or any other planning workflow, even when the project's CLAUDE.md or a skill says every change needs one. The user chose this command to make the change. Say so once in the final result ("not run through Specclaw: this was an artifact-parity run").
 
 ## Inputs
 
@@ -227,6 +228,7 @@ Replace in your app: <placeholders>
 Changes on its own: <rows from stage 5 step 4, if any>
 Not checked: <only with no_browser: "no browser (<reason>)">
 Fallback font in the check: <fallback_fonts, if any>
+Build it with: <the build command (see "Feedback and handoff")>
 ```
 
 Leave out a line that has nothing to say. With a loading screen, add: "To see the loading screen, open the link with #hold-loader at the end."
@@ -235,8 +237,10 @@ Leave out a line that has nothing to say. With a loading screen, add: "To see th
 
 Ask once with AskUserQuestion, header `Next`:
 
-- Redesign or new part: "How does it look?" - `Build it into the app (Recommended)` — runs /artifact-parity:build with this design (when rows changed on their own, say the build will report them) / `Change something` — type what to change / `Keep it, build later` — you get the command
-- Standalone: "How does it look?" - `Keep it (Recommended)` — you get the command to build it later inside a project / `Change something`
+- Redesign or new part: "How does it look?" - `Build it into the app (Recommended)` — runs `<the build command>` (when rows changed on their own, say the build will report them) / `Change something` — type what to change / `Keep it, build later` — you get `<the build command>` to run yourself
+- Standalone: "How does it look?" - `Keep it (Recommended)` — you get `<the build command>` to run later inside a project / `Change something`
+
+`<the build command>` is the full `/artifact-parity:build ...` line from below, written out in the option's description so the user sees exactly what will run.
 
 **Change something:** apply the change to `design.html`, write `design.page.html` again (stage 4 step 6), run stage 5 again (for a small change, steps 1, 2 and 4; with no_browser, steps 1 and 5), republish to the same link (publish the same file again), and ask again. Each round prints the stage 4-6 lines again.
 

@@ -7,6 +7,13 @@ The reasoning behind the bigger changes is in [docs/DECISIONS.md](docs/DECISIONS
 
 ---
 
+## v0.10.1 — Leave Specclaw out, and show the build command after a design
+
+- Specclaw is no longer one of the optional plugins the skills offer suggests.
+- Design and build runs no longer start a Specclaw proposal (or any other change workflow), even when
+  the project's CLAUDE.md asks for one; the result says so.
+- After a design, the options and the result show the exact `/artifact-parity:build ...` command.
+
 ## v0.10.0 — Design an artifact from plain words, then build it
 
 - **New `/artifact-parity:design`.** Describe the UI you want and where it goes (redesign a part you

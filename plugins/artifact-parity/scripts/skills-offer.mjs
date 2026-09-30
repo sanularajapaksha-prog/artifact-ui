@@ -304,7 +304,6 @@ function selfTest() {
     };
     skill('design-taste-frontend');
     skill('animate');
-    skill('specclaw');
     skill('tailwind-v4');
     const lockFile = path.join(tmp, 'lock.json');
     fs.writeFileSync(lockFile, `﻿${JSON.stringify({ version: 3, skills: {
@@ -327,16 +326,18 @@ function selfTest() {
     const pl = Object.fromEntries(state.optional.map((p) => [p.name, p.status]));
     assert(pl.ponytail === 'installed', 'a user-scope plugin counts');
     assert(pl.caveman === 'missing', "another project's plugin does not count here");
-    assert(pl.specclaw === 'as-skills', 'a plugin already present as a plain skill is not offered as missing');
+    skill('caveman');
+    assert(check(env).optional.find((p) => p.name === 'caveman').status === 'as-skills', 'a plugin already present as a plain skill is not offered as missing');
+    fs.rmSync(path.join(configDir, 'skills', 'caveman'), { recursive: true });
     assert(check({ ...env, simulateMissing: ['design-taste-frontend'] }).design[0].status === 'missing', 'simulated missing');
 
-    const cmd = commands(state, null, ['specclaw'], true);
+    const cmd = commands(state, null, ['caveman'], true);
     assert(commands(state, null, ['caveman']).skills.length === 0, 'without --all or --pick no design skill is installed');
     assert(cmd.skills.some((c) => c.includes('skills@1.7.0 add "leonxlnx/taste-skill" -s high-end-visual-design redesign-existing-projects')), 'pinned CLI, grouped by repo, installed ones left out');
     assert(cmd.skills.some((c) => c.includes('"emilkowalski/skills" -s emil-design-eng -g')), 'the other-source animate is never replaced unasked');
     assert(cmd.skills.some((c) => c.includes('"pbakaus/impeccable" -s impeccable -g')), 'impeccable alone, never the whole repo');
     assert(cmd.skills.every((c) => /^npx -y skills@[\d.]+ add "/.test(c)), 'source comes first');
-    assert(cmd.plugins.length === 1 && cmd.plugins[0].cli[1] === 'claude plugin install specclaw@chan4lk', 'plugin commands');
+    assert(cmd.plugins.length === 1 && cmd.plugins[0].cli[1] === 'claude plugin install caveman@caveman', 'plugin commands');
     const picked = commands(state, ['animate', 'nope'], null);
     assert(picked.skills[0].includes('-s animate') && picked.needBackup[0] === 'animate', 'a picked replacement is included and needs a backup');
     assert(picked.unknown[0] === 'nope', 'unknown picks are reported');

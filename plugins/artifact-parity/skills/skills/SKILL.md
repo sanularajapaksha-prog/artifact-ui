@@ -1,6 +1,6 @@
 ---
 name: skills
-description: Show the skills artifact-parity recommends for designing UI (design direction, visual polish, motion, critique, finding more skills) plus three optional plugins, and install only the ones the user picks; also removes the skills this plugin installed. Use when the user types /artifact-parity:skills, asks which skills artifact-parity recommends or to install its default skills, and when a session-start note from artifact-parity says recommended skills are not installed yet.
+description: Show the skills artifact-parity recommends for designing UI (design direction, visual polish, motion, critique, finding more skills) plus two optional plugins, and install only the ones the user picks; also removes the skills this plugin installed. Use when the user types /artifact-parity:skills, asks which skills artifact-parity recommends or to install its default skills, and when a session-start note from artifact-parity says recommended skills are not installed yet.
 argument-hint: [remove]
 ---
 
@@ -32,7 +32,7 @@ From the JSON:
   - `missing`
   - `other-source`: the user has a skill with the same name from another author; `source` says which.
   - `kept`: an `other-source` skill the user chose to keep before.
-- `optional[]`: ponytail, caveman and specclaw with `status` `installed`, `as-skills` (its skills are there without the plugin's auto-start) or `missing`.
+- `optional[]`: ponytail and caveman with `status` `installed`, `as-skills` (its skills are there without the plugin's auto-start) or `missing`.
 - `groups`: the display name of each group.
 
 ## 2. Show the list

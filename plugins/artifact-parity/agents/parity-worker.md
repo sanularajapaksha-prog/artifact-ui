@@ -53,6 +53,7 @@ The main conversation sends you:
    - **Tag every element.** Every in-scope element listed in `ref-map.md` gets its `data-ref="r-###"`.
    - **One section at a time.** Build section by section.
    - **Report honestly.** Never claim "done" or "exact" unless the latest `report.md` shows it.
+   - **No change-workflow tools.** This run is its own change record: don't start a Specclaw proposal (`/specclaw:propose` or any other `/specclaw:*` command) or any other planning workflow, even when the project's CLAUDE.md or a skill says every change needs one. The user chose this command to make the change. Say so once in the final result ("not run through Specclaw: this was an artifact-parity run").
    - **Credentials stay secret.** A pasted username/password is used once, only as the `PARITY_LOGIN_USER` / `PARITY_LOGIN_PASS` environment of the single login command. Never write it to a file, NOTES, a progress note or your reply; from env files, refer to key names only.
 7. **Credit rules:**
    - Read the artifact source fully only in stage 6.
