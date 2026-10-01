@@ -54,16 +54,19 @@ Examples:
 /artifact-parity:design a parallax hero with animations and a loading screen, new on the home page
 /artifact-parity:design redesign the pricing section, calmer and more premium
 /artifact-parity:design a landing page for a coffee subscription, standalone
+/artifact-parity:design redesign the whole app, calmer and more consistent
 ```
 
 ### How a design goes
 
-1. **Read your project.** Your framework, design tokens, fonts and dark mode, and where the design goes: a redesign of a part you have, a new part at a place in your frontend, or a standalone design. For a redesign it reads the existing component, so nothing it does gets lost.
+1. **Read your project.** Your framework, design tokens, fonts and dark mode, and where the design goes: a redesign of a part you have, a new part at a place in your frontend, the whole app, or a standalone design. For a redesign it reads the existing component, so nothing it does gets lost.
 2. **Your answers - once.** Where it goes, any real gap in the requirement, and which skills to use (installed ones first; a missing one can be found on skills.sh and installed, only if you pick it).
 3. **Direction, then the page.** It prints a short direction - concept, type, color, layout, motion, and a checklist of everything you asked for - then writes the page, using your project's own tokens and fonts for a redesign or new part.
 4. **Check.** The page is opened in a real browser at 1440, 768 and 390 wide, critiqued against the taste skills and your checklist, and fixed up to twice. A final double capture checks that it looks the same every time it loads, which the build needs; anything that still changes on its own is listed.
 5. **Publish.** You get the link. Ask for changes as often as you like; each one is checked and republished to the same link.
 6. **Build it.** Say yes and `/artifact-parity:build` starts with the design and the place already filled in.
+
+**A whole app** ("the whole app", "all pages", or several screens by name) becomes one artifact: your header and navigation, and every screen (up to 16), switched by the nav and each linkable as `#screen-<name>`. Every screen is checked on its own. The build then runs once for the shell and once per screen, each changed in place on its own route.
 
 The design never touches your app's code: everything it writes is in `design-ref/_designs/<name>/`.
 

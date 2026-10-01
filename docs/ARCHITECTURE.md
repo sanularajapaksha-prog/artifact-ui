@@ -45,7 +45,8 @@ user's conversation, because designing is a conversation (a direction, feedback,
 same link) and the Artifact tool only publishes to an artifact the current conversation has read or
 published (D18). It uses the same scripts and the same printer (`progress.mjs --run design`, 6 stages),
 writes only to `design-ref/_designs/<slug>/`, and ends by invoking the build with the local file and a
-fixed-shape BRIEF.
+fixed-shape BRIEF. A whole-app design holds every screen in one artifact; it is checked screen by screen
+(`progress.mjs done 5 --from-reports`) and built with one build per screen (D18 note).
 
 ```mermaid
 flowchart LR

@@ -1,6 +1,6 @@
 ---
 name: design
-description: Design new UI as a claude.ai artifact from a plain-words requirement (for example a parallax hero with animations and a loading screen), for a redesign of a part of the user's project, a new part to add to their frontend, or a standalone design; gets the skills it needs, checks the page in a real browser, publishes it, takes feedback, then hands it to /artifact-parity:build. Run only when the user types /artifact-parity:design.
+description: Design new UI as a claude.ai artifact from a plain-words requirement (for example a parallax hero with animations and a loading screen), for a redesign of a part of the user's project, a new part to add to their frontend, a whole app (every screen in one artifact), or a standalone design; gets the skills it needs, checks the page in a real browser, publishes it, takes feedback, then hands it to /artifact-parity:build. Run only when the user types /artifact-parity:design.
 argument-hint: <what you want, in plain words> [where it goes]
 disable-model-invocation: true
 ---
@@ -21,7 +21,7 @@ You turn the user's requirement into a polished artifact they will want to build
 Arguments: `$ARGUMENTS`
 
 - **REQUIREMENT:** what the user wants, in their words, for example "a parallax hero with animations and a loading screen".
-- **WHERE:** the place, if they named one: "redesign the pricing section", "a new hero on the home page", "just a standalone page".
+- **WHERE:** the place, if they named one: "redesign the pricing section", "a new hero on the home page", "the whole app" or several screens ("findings, discover and patterns"), "just a standalone page".
 - If `$ARGUMENTS` is empty, take both from the user's message. If there is no requirement at all, ask for it in one line and stop.
 - **slug:** a short kebab-case name from the requirement, for example `parallax-hero`. Use it for folder names; the page's `<title>` is a real name (see the rules for the page).
 
@@ -67,6 +67,7 @@ node "<ROOT>/scripts/detect-project.mjs" --project "." [flags for anything the u
    - Dark mode: none, media (`prefers-color-scheme`), or class (`.dark`, `[data-theme]`, next-themes).
 3. **The place.** Search the router config or pages folder, component file names, page titles, headings and nav labels for the place WHERE names. Record up to 3 place candidates, best first, each `enhance` (an existing component there is being redesigned) or `new` (a new part goes there), with `file` and `route`. Nothing outside `app_dir`.
    - **For a redesign,** read the existing component: its markup, visible text, props, and every feature it has (buttons, states, lists). The design must keep all of them, in the same order, so the build can change it in place without losing anything.
+   - **A whole app** (WHERE says "the whole app", "all pages", "every screen", or names several screens): this is the `app` case. Read the shell (the layout with the header or navigation) and list every screen from the router or pages folder, in the app's navigation order: its name, route, page file and the nav text that opens it. Leave out screens that only redirect, and sign-in or error pages unless WHERE names them. At most 16 screens; with more, keep the 16 the navigation shows first and name the rest as left out. Read each screen's page file as for a redesign: its sections, visible text, fields, actions and states.
 4. **Safety.** If the requirement asks to copy a real company's or person's brand (name, logo, trademarked look) or to make a working login or payment form that imitates a real service, plan a placeholder name and original visuals instead ("in the style of", no logos). If it can't be made safe, stop here with a one-sentence reason: the artifact would be refused at publish time anyway.
 5. **Skills.** Follow `<ROOT>/skills/scout/SKILL.md` Steps 1-4 and Step 4b in **design mode**:
    - Design parts from `<ROOT>/bundle.json` `parts`: `direction`, `motion`, `critique`, plus `redesign` whenever any place candidate is a redesign (it is only used if the user ticks it and picks a redesign).
@@ -83,7 +84,7 @@ Run `progress.mjs wait 3 --note "<n> questions"`. Ask everything in one round wi
 
 | id | Ask when | Question and options |
 |---|---|---|
-| `where` | there are at least 2 options | "Where does this design go?" - the place candidates as `Redesign <file> (<route>)` or `New part at <file> (<route>)`, and `Standalone design (no project)`. With an app but no place found: `New part at <conventional location> (Recommended)` (with the project's look) and `Standalone design`. With no app: `Standalone design (Recommended)` and, only if WHERE named a place, `I'll open the project first`. With only one possible answer, don't ask: use it and say so in the stage 3 line |
+| `where` | there are at least 2 options | "Where does this design go?" - the place candidates as `Redesign <file> (<route>)` or `New part at <file> (<route>)`, and `Standalone design (no project)`. With an app but no place found: `New part at <conventional location> (Recommended)` (with the project's look) and `Standalone design`. With no app: `Standalone design (Recommended)` and, only if WHERE named a place, `I'll open the project first`. With only one possible answer, don't ask: use it and say so in the stage 3 line. For the `app` case: `The whole app: <n> screens in one artifact (Recommended)` (the screen names as the description), plus `Only <the first screen>` |
 | `stated` | a stated value was not found | "<what> was not found. What should I use?" - the likely matches |
 | `gap-1`, `gap-2` | the requirement leaves a real choice open that changes the design | For example "The loading screen shows:" - `A progress bar (Recommended)` / `The logo mark, pulsing`. At most 2; never ask about taste, and never offer an option the rules for the page forbid |
 | `skills` | skills were matched | "Use these skills for this design?" - multi-select, one option per matched skill (at most 4, the cap from stage 2), `design-taste-frontend` first with "main skill" at the start of its description: label `<skill>`, description `<part> · <installs> installs (or "installs unknown") · <source> · "you used it before" when true`. The user ticks the ones to use; at most 4 are used. With one skill: `Use <skill> (Recommended)` / `Don't use it` |
@@ -96,7 +97,7 @@ Run `progress.mjs wait 3 --note "<n> questions"`. Ask everything in one round wi
 Then act on the answers, without asking again:
 
 - **Installs:** for each picked missing skill, scout Step 5b steps 4-5 (`npx -y skills@1.7.0 add "<owner/repo>" -s "<skill>" -g -y -a claude-code`). If a skill with the same name from another source is already installed, don't replace it (that needs a yes the user hasn't given): skip it, use no skill for that part, and say so in the result. When it lands, add it to the plugin's list with `node "<ROOT>/scripts/skills-offer.mjs" --track <skill> --data "<DATA>"`. For `Install and use them`: `node "<ROOT>/scripts/skills-offer.mjs" --commands --all --data "<DATA>"`, run its `skills` commands, then `--record installed --names <the ones that landed> --data "<DATA>"`, or `--record later --names <the ones that landed>` when any failed. The landed bundle skills count as confirmed for their design parts, within the cap of 4 (the `redesign` skill only for a redesign). For `Not now`: `--record later --data "<DATA>"`. A failed install: go on without it and note it for the result; never install another candidate instead.
-- **The case** comes from `where`: `redesign`, `new` or `standalone`. The `redesign` skill is used only when it was ticked and the case is a redesign; no skill is ever added after the answers. `I'll open the project first`: say how to run the same command inside the project, run `progress.mjs fail 3 --note "run it inside the project"`, and stop.
+- **The case** comes from `where`: `redesign`, `new`, `app` or `standalone`. An `app` design also uses the `redesign` skill when it was ticked. The `redesign` skill is used only when it was ticked and the case is a redesign; no skill is ever added after the answers. `I'll open the project first`: say how to run the same command inside the project, run `progress.mjs fail 3 --note "run it inside the project"`, and stop.
 - **Save** the confirmed skills under `design/<label>` keys (scout Step 7).
 
 Run `progress.mjs done 3 --note "<case>: <place or standalone> · <skills in use or none>"`.
@@ -126,7 +127,7 @@ Motion: <what moves, how and when; the one signature moment>
 Checklist: <each thing the user asked for, as a short item>
 ```
 
-5. **The draft:** write `design-ref/_designs/<slug>/design.html`, one self-contained page that follows every rule below. Write `design.meta.json` next to it: `{ "requirement", "case", "place": { "mode", "file", "route" } | null, "app_dir", "stack", "dark": "none | media | class", "placeholders": ["texts to replace in the app"], "fonts_self_hosted": ["families the app loads from its own files"], "fallback_fonts": [], "skills": [], "link": null }`.
+5. **The draft:** write `design-ref/_designs/<slug>/design.html`, one self-contained page that follows every rule below. For the `app` case, follow "A whole app in one artifact" below and write the file in pieces: the `<title>`, the `<style>` with the shared tokens and components, and the shell first; then add one screen per edit, in the navigation order; the screen-switching script last. Never try to write the whole app in one go. Write `design.meta.json` next to it: `{ "requirement", "case", "place": { "mode", "file", "route" } | null, "app_dir", "stack", "dark": "none | media | class", "placeholders": ["texts to replace in the app"], "fonts_self_hosted": ["families the app loads from its own files"], "fallback_fonts": [], "skills": [], "link": null }`. For the `app` case add `"shell": { "file" }` and `"screens": [{ "name", "slug", "route", "file", "nav" }]`.
 6. **The full page.** `design.html` is what gets published, and the Artifact tool wraps it in its own document skeleton, so it has no `<!doctype>`, `<html>`, `<head>` or `<body>` of its own. The browser check and the build need the page as viewers get it, so write `design.page.html` from it (in the same skeleton), and again after every change to `design.html`:
 
 ```
@@ -143,7 +144,15 @@ These keep the page true to the requirement, buildable, and fully checkable by `
 
 - **Plain HTML in one file, without a document skeleton:** start with `<title>` and `<style>`, then the content and scripts; no `<!doctype>`, `<html>`, `<head>` or `<body>` tags (the Artifact tool adds them). Set the base yourself, so the page looks the same inside the published frame, which adds a small reset of its own, and in `design.page.html`: `:root { color-scheme: light }` (dark in the dark blocks), `body { margin: 0; font: <size>/<line-height> <your text font>; background: var(--<bg token>); color: var(--<text token>) }`, `img { max-width: 100% }` and `[hidden] { display: none !important }`.
 - **All CSS in one inline `<style>`;** no local files, and no stylesheet links except Google Fonts (the Artifact frame blocks every other stylesheet: inline a library's CSS instead). Scripts only from `cdn.jsdelivr.net/npm` or `cdnjs.cloudflare.com` with pinned versions (for example `gsap@3.12.5`). No external images: draw with CSS, SVG or gradients. `<title>` is a distinctive 2-4 word name (for example the placeholder brand and the part, `Keelson Hero`), not a category like "parallax hero"; the slug stays for folders.
-- **Only the designed part.** No demo navigation or filler around it. For a new part, show just that part; for a redesign, just the component being redesigned.
+- **Only the designed part.** No demo navigation or filler around it. For a new part, show just that part; for a redesign, just the component being redesigned. For the `app` case the designed part is the whole app: its shell and every screen.
+- **A whole app in one artifact (`app` case):**
+  - The app's real shell (header, navigation, user chip) with every nav item, in order.
+  - One `<section class="screen" id="screen-<slug>" aria-label="<screen name>">` per screen, in the navigation order. Only one screen shows at a time; the others carry `hidden`.
+  - Each nav item is a `<button>` or `<a href="#screen-<slug>">` with the screen's real nav text, unique on the page; clicking it shows that screen and marks the item as current (`aria-current="page"`).
+  - `location.hash` `#screen-<slug>` opens that screen on load and on `hashchange`, so every screen can be linked and checked on its own; with no hash the first screen shows. The Artifact frame passes a plain hash like this.
+  - One shared set of tokens and component classes (cards, tables, buttons, tags, headings) used by every screen, so the screens look like one product.
+  - Each screen keeps its own sections, labels, fields and actions, in order, like any redesign. Where the page file has its own rows or values (static lists, table rows, stat values), show those, so the build compares like with like; otherwise use made-up sample rows that fit each screen. Add no column or field the screen's data doesn't have.
+  - Nothing on a screen may depend on another screen having been shown first.
 - **For a redesign or a new part: the project's look.** Use its token names and values, its fonts and its spacing exactly; the taste skills shape the design within them. Keep every feature, label and piece of content of a redesigned component, in order.
 - **Fonts:** Google fonts by `<link>`. A font the app loads from its own files: when its license allows sharing the file (for example OFL fonts and `@fontsource` packages), embed it in the page as an `@font-face` with a `data:` URL (woff2 where there is one), so the check measures the real font, and add the family to `fonts_self_hosted`; the build keeps the app's own loading for it. Otherwise (a commercial license, or no file found) use the family name only, add it to `fallback_fonts` in `design.meta.json`, and say so in the result.
 - **Dark mode follows the project.** The Artifact page contract wants dark tokens under `@media (prefers-color-scheme: dark)` guarded by `:root:not([data-theme="light"])`, and again under `:root[data-theme="dark"]`. If the project has no dark mode, give those dark tokens the light values. Never rely on `light-dark()` alone.
@@ -171,7 +180,7 @@ node "<ROOT>/scripts/check-source.mjs" --file "design-ref/_designs/<slug>/design
 ```
 
    `✖`: fix the page and run it again. Keep its `⚠ not measured by the parity check: ...` line for the result.
-2. **Look at it.** Capture once:
+2. **Look at it.** Capture once (for the `app` case, see "Checking a whole app" below):
 
 ```
 node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode ref --target "design-ref/_designs/<slug>/design.page.html" --out "design-ref/_designs/<slug>/check"
@@ -192,7 +201,7 @@ node -e "console.log(require('url').pathToFileURL(process.argv[1]).href + '#hold
    - It does not look like a template: a distinct idea, not generic cards on a gradient.
 
    Fix what you find and capture again. At most 2 fix rounds.
-4. **It must be stable.** Once the page is final, capture it twice and compare the two captures; any row is a part that changes on its own, which no build can match:
+4. **It must be stable.** Once the page is final, capture it twice and compare the two captures; any row is a part that changes on its own, which no build can match (for the `app` case, see "Checking a whole app" below):
 
 ```
 node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode ref --target "design-ref/_designs/<slug>/design.page.html" --out "design-ref/_designs/<slug>/check-a"
@@ -212,6 +221,18 @@ node "<ROOT>/scripts/scope-guard.mjs" --check --app "design-ref/_designs/<slug>"
 
 Run `progress.mjs done 5 --from-report "design-ref/_designs/<slug>/check-a"` (the line's numbers come from `result.json`; never add counts to it yourself).
 
+### Checking a whole app (`app` case)
+
+Check every screen on its own, using its hash. For each screen, print its target with:
+
+```
+node -e "console.log(require('url').pathToFileURL(process.argv[1]).href + '#screen-' + process.argv[2])" "design-ref/_designs/<slug>/design.page.html" "<screen slug>"
+```
+
+- **Look:** capture each screen into `check/<screen slug>` (step 2's command with that target), and run `progress.mjs sub 5 --note "screen <i>/<n> <screen name>"` as each begins. View `ref-1440.png` of every screen, and `ref-768.png` and `ref-390.png` of the first screen and of any screen whose layout differs. Critique every screen with step 3's list, plus: the screens look like one product (same tokens, cards, tables and type), and the current nav item is clear. At most 2 fix rounds for the whole app; after a fix, capture again only the screens it touched.
+- **Stable:** capture each screen twice, into `check-a/<screen slug>` and `check-b/<screen slug>`, copy `check-b/<screen slug>/ref.json` to `check-a/<screen slug>/build.json`, and run `compare.mjs --dir "design-ref/_designs/<slug>/check-a/<screen slug>"` for each.
+- **One line for all screens:** `progress.mjs done 5 --from-reports "design-ref/_designs/<slug>/check-a/<first slug>,design-ref/_designs/<slug>/check-a/<second slug>,..."`. It adds up every screen's `result.json`.
+
 ## Stage 6 - Publish
 
 Run `progress.mjs start 6`.
@@ -223,7 +244,7 @@ Run `progress.mjs done 6 --note "<the link>"`, then print one short block:
 
 ```
 🎨 <slug>: <the link>
-In it: <each Checklist item>
+In it: <each Checklist item; for the `app` case, the screens, each with its link `<link>#screen-<slug>`>
 Not measured by the build check: <the check-source list, plus anything from the rules you could not avoid, for example GSAP parallax distance>
 Replace in your app: <placeholders>
 Changes on its own: <rows from stage 5 step 4, if any>
@@ -238,6 +259,7 @@ Leave out a line that has nothing to say. With a loading screen, add: "To see th
 
 Ask once with AskUserQuestion, header `Next`:
 
+- Whole app: "How does it look?" - `Build all screens into the app (Recommended)` — runs the builds below one after another, the shell first / `Change something` — type what to change / `Keep it, build later` — you get the build commands to run yourself
 - Redesign or new part: "How does it look?" - `Build it into the app (Recommended)` — runs `<the build command>` (when rows changed on their own, say the build will report them) / `Change something` — type what to change / `Keep it, build later` — you get `<the build command>` to run yourself
 - Standalone: "How does it look?" - `Keep it (Recommended)` — you get `<the build command>` to run later inside a project / `Change something`
 
@@ -254,5 +276,14 @@ design-ref/_designs/<slug>/design.page.html build all of it · <enhance <file> |
 - Add ` · light only` when the project has no dark mode, ` · fonts: <family> from the app` for each family in `fonts_self_hosted`, and ` · fallback font: <family>` for each in `fallback_fonts`.
 - The source is `design.page.html`: the published page inside a complete document, like the one the Artifact frame gives it. The build's helper may not be able to open a private link, and a local file also works offline.
 - The build still asks its own questions, including which skills to use for building.
+
+**A whole app** is built one part at a time, from the same design: the shell first, then each screen in the navigation order. Each build changes that part in place and asks its own short question round (skills, sign-in, the end). The commands:
+
+```
+design-ref/_designs/<slug>/design.page.html build only the shell · enhance <shell file> on <first route>[ · light only]
+design-ref/_designs/<slug>/design.page.html build only the <screen name> screen · click: <its nav text> · enhance <its page file> on <its route>[ · light only]
+```
+
+For `Build all screens into the app`, invoke the `artifact-parity:build` skill with the first command, and when it finishes, with the next, until all are done, then run the shell command once more: it now only measures, and with every screen built its score is the shell's final one. If one stops on a blocker, stop there and list the commands still to run. Print the whole list first, so the user sees what will run.
 
 **Keep it, build later:** print that same command as `/artifact-parity:build <arguments>` for the user to run inside the project. For a standalone design there is no place yet, so print `/artifact-parity:build <the link, or the full path of design.page.html> build all of it` and tell the user to add where it goes in plain words.

@@ -7,6 +7,24 @@ The reasoning behind the bigger changes is in [docs/DECISIONS.md](docs/DECISIONS
 
 ---
 
+## v0.11.0 — Design a whole app in one artifact
+
+- **Whole apps.** `/artifact-parity:design` can now design every screen of an app in one run: ask for
+  "the whole app", "all pages" or name several screens. It reads your shell and router, lists the screens
+  (up to 16), and writes one artifact with your app's header and navigation and every screen, switched by
+  the nav. Each screen also opens by its own link (`#screen-<name>`).
+- Each screen is checked on its own at 1440, 768 and 390, and for stability; the stage line adds them up
+  ("two captures match on all 3 screens").
+- **Building it:** the handoff offers to build the shell and then every screen into your app, one after
+  another, each changed in place on its own route. Or run the printed build commands yourself, one per
+  screen (`build only the <screen> screen · click: <nav text> · enhance <file> on <route>`). After the
+  last screen, the shell is measured once more, now with every screen in place. — D18 note
+- Each screen and the shell get their own build folder (`design-ref/<design>-<screen>/`), so two designs
+  never mix. The shell build includes the box that holds the screens (its width and padding), so the
+  screens line up; the design's tokens go on the shell root and reach every screen.
+- A design shows each screen's own rows and values when the page has them, so the build compares like
+  with like instead of reporting sample data as differences.
+
 ## v0.10.2 — Make the taste skill lead every design
 
 - `design-taste-frontend` is the main skill of every design: it is offered first in the skills question,

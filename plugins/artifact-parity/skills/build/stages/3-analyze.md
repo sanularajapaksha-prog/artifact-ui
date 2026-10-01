@@ -32,7 +32,11 @@ node "<ROOT>/scripts/detect-project.mjs" --project "." [user-stated values as fl
 ```
 build all of it · enhance <file> on <route> · light only
 build all of it · new at <file> on <route>
+build only the shell · enhance <file> on <route>
+build only the <screen name> screen · click: <nav text> · enhance <file> on <route>
 ```
+
+(The last two come from a whole-app design: one artifact holding the app's shell and every screen, where a nav click shows each screen.)
 
 (`light only` appears only when the app has no dark mode; `fonts: <family> from the app` and `fallback font: <family>` may follow, and so may known phrases such as "the app is in apps/web".) When the BRIEF has `enhance <file>` or `new at <file>`, that place is the first candidate, with the `why` "named in the brief"; still find its real `url` as below.
 
@@ -47,6 +51,7 @@ Search the router config or pages folder, component file names, page titles, hea
 node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode ref --target "<source_file>" --out "design-ref/<screen>"
 ```
 
+- **A BRIEF with `click: <nav text>`:** capture the reference again with `--click "<nav text>"` right away; that is the recommended state, and `recommended_clicks` is `["<nav text>"]`. The real app shows that screen at its own route, so the place's `url` is that route and needs no click.
 - Read `ref-map.md` (not `ref.json`). If the part the BRIEF names isn't there, or the BRIEF names a mode or tab ("timeline tab", "preview mode"), find the control under **State controls** that shows it and capture again with `--click "<control text or #id>"` (repeat for several clicks, in order). The last capture must be the state you recommend.
 - Record `states`: each state you captured (its clicks and what it shows), and `recommended_clicks`.
 - If capture printed `⚠ fonts not loaded: <families>`, record them under `fonts_missing` (not `problems`, which become questions): the reference itself shows a fallback font for those families. A design BRIEF's `fallback font: <family>` goes into `fonts_missing` too.
@@ -57,6 +62,7 @@ node "<ROOT>/scripts/capture.mjs" --data "<DATA>" --mode ref --target "<source_f
 From the **Parts** list and the element lines in `ref-map.md`, record up to 3 **part candidates**, best first:
 
 - the smallest named part holding everything the BRIEF names (for example `step-tracker [r-023..r-055 · 33]`) - never its page-wide wrapper
+- for `only the <screen name> screen`: the entry under **Parts** labelled exactly <screen name> (the screen's `aria-label`), as `elements` (its range); for `only the shell`: as `elements`, the ranges of the header and navigation plus the id alone (no range) of the element that holds the screens, so its width and padding are built but no screen inside it
 - a bigger alternative (its wrapper, or its whole section) and, if the BRIEF names no part, `all`
 - each with `elements` (a range) or `sections`, its `count`, and a one-line `why`
 

@@ -18,7 +18,7 @@ Run `progress.mjs start 6`.
    - dark mode: when the facts say `dark: light-only`, don't port the artifact's dark rules (its `@media (prefers-color-scheme: dark)` and `[data-theme="dark"]` blocks); build the light theme only and add a decision saying so
    - any base styles the artifact relies on
 
-   If the project's global CSS (reset, base line-height, box-sizing, body font) differs from the artifact's, correct it at the component root. Do not edit global styles for the whole app.
+   If the project's global CSS (reset, base line-height, box-sizing, body font) differs from the artifact's, correct it at the component root. Do not edit global styles for the whole app. For a BRIEF `build only the shell`, the shell root is that root: the design's tokens and base font go there, so every screen inside it gets them (the whole-app design shares them on purpose); say so in `decisions`. Cancel any global rule of the app that hits the same class names (for example a global `.nav a` margin) at the same root.
 4. **`enhance` mode - change the existing component, keep what it does:**
    - **Keep:** state, hooks, data fetching, props and their types, event handlers, routing, permissions, i18n keys, `data-testid` and accessibility attributes. Do not rename exports or move files.
    - **Change:** markup structure where the artifact's layout depends on it, class names, inline styles and tokens, icons, motion - to the artifact's exact values.

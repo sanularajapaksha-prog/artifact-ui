@@ -389,6 +389,23 @@ it to the build.
   (`build all of it · enhance <file> on <route> · light only`) that stages 3 and 4 recognise, so the build
   does not ask again for the place and the part.
 
+**Note (v0.11.0) — a whole app in one artifact.** The design used to allow one place per run ("only the
+designed part"), so asking for a whole app got one screen. Now an `app` case puts the shell and every
+screen in one artifact: one `<section class="screen" aria-label="<name>">` per screen, the others
+`hidden`, and the nav (or the `#screen-<slug>` hash, which the Artifact frame passes) switches them.
+
+- **Checked per screen, scored once.** The capture measures what is visible, so each screen is captured
+  by its hash on its own; `progress.mjs done 5 --from-reports <dir>,<dir>,...` adds up every screen's
+  `result.json` (still never a model's count, D3).
+- **Built per screen, not all at once.** A real app shows each screen at its own route, and the build
+  measures one state of one page. So the handoff runs one build per part, the shell first:
+  `build only the <screen> screen · click: <nav text> · enhance <file> on <route>`. Stage 3 captures the
+  reference after that click, and the part is the screen's entry under **Parts** (the visible screen
+  section, by its `aria-label`). One build for the whole app would need multi-route captures and a
+  score per route; not worth it while a sequence of builds gives the same result.
+- **Written in pieces.** A whole app is too long to write in one go reliably, so the draft is written
+  shell first, then one screen per edit, the script last.
+
 ## D19 — Skills are confirmed, and the recommended ones are offered once
 
 **Version:** v0.10.0 · **Files:** `skills/scout/SKILL.md`, `stages/3-analyze.md`, `stages/4-your-answers.md`, `stages/5-set-up.md`, `bundle.json`, `scripts/skills-offer.mjs`, `hooks/hooks.json`, `skills/skills/SKILL.md`

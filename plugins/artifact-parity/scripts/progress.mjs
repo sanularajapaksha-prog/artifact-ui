@@ -12,6 +12,7 @@
 //   progress.mjs sub   <stage> --note <text>          (detail while a stage runs)
 //   progress.mjs done  <stage> [--note <text>] [--score <text>]
 //   progress.mjs done  <stage> --from-report <design-ref/screen> [--note <extra>]
+//   progress.mjs done  <stage> --from-reports <dir>,<dir>,... [--note <extra>]   (several reports added up)
 //                      (score and row count come from compare's result.json, never from a summary)
 //   progress.mjs skip  <stage> [--note <text>]
 //   progress.mjs fail  <stage> --note <text>
@@ -240,9 +241,33 @@ function fromReport(dir, n, extra, kind) {
   // A design's check compares two captures of the same page: rows there are parts that change on their own.
   const plural = r.rows === 1 ? '' : 's';
   const rows = r.clean ? (kind === 'design' ? 'two captures match' : '')
-    : kind === 'design' ? `${r.rows} row${plural} differ between two captures` : `${r.rows} row${plural} ${n === 6 ? 'to fix' : 'left'}`;
+    : kind === 'design' ? `${r.rows} row${plural} ${r.rows === 1 ? 'differs' : 'differ'} between two captures` : `${r.rows} row${plural} ${n === 6 ? 'to fix' : 'left'}`;
   const state = r.stateRows ? `${r.stateRows} need an app state` : '';
   return { score: r.score, note: [rows, state, ...flagsOut, extra].filter(Boolean).join(` ${G.dot} `) };
+}
+
+// Several reports (a whole-app design checks each screen on its own) added up into one line, with the
+// same rules as compare: CLEAN only when every report is clean, and never 100% while a row is left.
+function fromReports(list, n, extra, kind) {
+  const dirs = list.split(',').map((d) => d.trim()).filter(Boolean);
+  if (!dirs.length) usage('--from-reports needs a comma-separated list of report folders');
+  if (/\d+\s*(rows?|differences?)\b|\d+\s*%|clean/i.test(extra)) usage('with --from-reports, --note may give a reason but no row counts, percentages or "clean" - those come from result.json');
+  const rs = dirs.map((dir) => {
+    try { return JSON.parse(fs.readFileSync(path.join(path.resolve(projectDir, dir), 'result.json'), 'utf8')); } catch { return usage(`--from-reports: no result.json in ${dir} - run compare first`); }
+  });
+  const sum = (k) => rs.reduce((s, r) => s + (Number(r[k]) || 0), 0);
+  const passed = sum('passed'); const checks = sum('checks'); const rowsN = sum('rows'); const stateN = sum('stateRows');
+  const clean = rs.every((r) => r.clean);
+  let pct = checks ? Math.floor((passed / checks) * 100) : 0;
+  if (!clean && pct === 100) pct = 99;
+  const score = clean ? `100% CLEAN (${passed}/${checks})` : `${pct}% (${passed}/${checks})`;
+  const plural = rowsN === 1 ? '' : 's';
+  const unclean = rs.filter((r) => !r.clean).length;
+  const rows = clean ? (kind === 'design' ? `two captures match on all ${rs.length} screens` : `${rs.length} reports`)
+    : kind === 'design' ? `${rowsN} row${plural} ${rowsN === 1 ? 'differs' : 'differ'} between two captures on ${unclean} of ${rs.length} screens`
+      : `${rowsN} row${plural} left in ${unclean} of ${rs.length} reports`;
+  const state = stateN ? `${stateN} need an app state` : '';
+  return { score, note: [rows, state, extra].filter(Boolean).join(` ${G.dot} `) };
 }
 
 function cmdEnd(kind) {
@@ -253,6 +278,7 @@ function cmdEnd(kind) {
   let note = typeof flags.note === 'string' ? flags.note : '';
   let score = typeof flags.score === 'string' ? flags.score : '';
   if (kind === 'done' && typeof flags['from-report'] === 'string') ({ score, note } = fromReport(flags['from-report'], n, note, kindOf(state)));
+  if (kind === 'done' && typeof flags['from-reports'] === 'string') ({ score, note } = fromReports(flags['from-reports'], n, note, kindOf(state)));
   if (kind === 'fail' && !note) usage('fail needs --note explaining why');
   state.waiting = '';
   st.endedAt = nowIso();

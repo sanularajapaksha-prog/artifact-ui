@@ -4,6 +4,7 @@ Run `progress.mjs start 2`.
 
 **Pick the folder.** Use the screen name from the facts. If there is none, derive a kebab-case name:
 
+- for a source in `design-ref/_designs/<slug>/` with a BRIEF `build only the shell` or `build only the <screen name> screen`: `<slug>-shell` or `<slug>-<screen name in kebab-case>`, so two designs never share a folder
 - from the part named in the BRIEF, for example `pricing-cards`
 - otherwise from the artifact's title or main heading
 
